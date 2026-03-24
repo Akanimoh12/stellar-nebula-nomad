@@ -10,18 +10,12 @@ repository = "https://github.com/yourusername/stellar-nebula-nomad"
 crate-type = ["cdylib"]
 
 [dependencies]
-soroban-sdk = { version = "0.20", features = ["derive"] }
-soroban-contract = "0.20"
+soroban-sdk = { version = "20", features = ["alloc"] }
 
 [dev-dependencies]
-soroban-sdk = { version = "0.20", features = ["derive"] }
+soroban-sdk = { version = "20", features = ["testutils"] }
 
 [profile.release]
 opt-level = "z"
 lto = true
 codegen-units = 1
-
-[[bin]]
-name = "stellar_nebula_nomad"
-path = "src/lib.rs"
-crate-type = ["cdylib"]
