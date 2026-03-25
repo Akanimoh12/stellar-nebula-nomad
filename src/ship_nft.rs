@@ -1,6 +1,4 @@
-use soroban_sdk::{
-    contracttype, contracterror, symbol_short, Address, Bytes, Env, Symbol, Vec,
-};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Bytes, Env, Symbol, Vec};
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────
 
@@ -88,7 +86,9 @@ fn enter_lock(env: &Env) -> Result<(), ShipError> {
 }
 
 fn exit_lock(env: &Env) {
-    env.storage().persistent().set(&DataKey::ReentrancyLock, &false);
+    env.storage()
+        .persistent()
+        .set(&DataKey::ReentrancyLock, &false);
 }
 
 // ─── Internal Helpers ────────────────────────────────────────────────────
@@ -96,11 +96,7 @@ fn exit_lock(env: &Env) {
 /// Fetch the next ship ID and increment the global counter.
 fn next_ship_id(env: &Env) -> u64 {
     let key = DataKey::ShipCounter;
-    let current: u64 = env
-        .storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or(0);
+    let current: u64 = env.storage().persistent().get(&key).unwrap_or(0);
     let next = current + 1;
     env.storage().persistent().set(&key, &next);
     next
@@ -159,12 +155,7 @@ pub fn emit_ship_minted(env: &Env, ship: &ShipNft) {
     );
 }
 
-pub fn emit_ownership_transferred(
-    env: &Env,
-    ship_id: u64,
-    from: &Address,
-    to: &Address,
-) {
+pub fn emit_ownership_transferred(env: &Env, ship_id: u64, from: &Address, to: &Address) {
     env.events().publish(
         (symbol_short!("ship"), symbol_short!("xfer")),
         (ship_id, from.clone(), to.clone()),
@@ -198,11 +189,7 @@ pub fn mint_ship(
     let id = next_ship_id(env);
     let (hull, scanner_power) = stats_for_type(ship_type);
 
-    if env
-        .storage()
-        .persistent()
-        .has(&DataKey::Ship(id))
-    {
+    if env.storage().persistent().has(&DataKey::Ship(id)) {
         exit_lock(env);
         return Err(ShipError::ShipAlreadyExists);
     }
@@ -254,11 +241,7 @@ pub fn batch_mint_ships(
         let id = next_ship_id(env);
         let (hull, scanner_power) = stats_for_type(&st);
 
-        if env
-            .storage()
-            .persistent()
-            .has(&DataKey::Ship(id))
-        {
+        if env.storage().persistent().has(&DataKey::Ship(id)) {
             exit_lock(env);
             return Err(ShipError::ShipAlreadyExists);
         }

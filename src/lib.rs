@@ -7,6 +7,11 @@ mod resource_minter;
 mod ship_nft;
 mod ship_registry;
 
+mod dex_integration;
+mod difficulty_scaler;
+mod randomness_oracle;
+mod treasure_vault;
+
 pub use nebula_explorer::{
     calculate_rarity_tier, compute_layout_hash, generate_nebula_layout, CellType, NebulaCell,
     NebulaLayout, Rarity, GRID_SIZE, TOTAL_CELLS,
@@ -18,20 +23,29 @@ pub use resource_minter::{
 pub use ship_nft::{ShipError, ShipNft};
 pub use ship_registry::Ship;
 
+pub use dex_integration::{cancel_listing, harvest_and_list};
+pub use difficulty_scaler::{
+    apply_scaling_to_layout, calculate_difficulty, DifficultyError, DifficultyResult,
+    RarityWeights, MAX_LEVEL,
+};
+pub use randomness_oracle::{
+    get_entropy_pool, request_random_seed, verify_and_fallback, OracleError,
+};
+pub use treasure_vault::{
+    claim_treasure, deposit_treasure, get_vault, TreasureVault, VaultError,
+    DEFAULT_MIN_LOCK_DURATION,
+};
+
 #[contract]
 pub struct NebulaNomadContract;
 
 #[contractimpl]
 impl NebulaNomadContract {
-    /// Generate a 16×16 procedural nebula map using ledger-seeded PRNG.
+    /// Generate a 16x16 procedural nebula map using ledger-seeded PRNG.
     ///
     /// Combines the supplied `seed` with on-chain ledger sequence and
     /// timestamp. The player must authorize the call.
-    pub fn generate_nebula_layout(
-        env: Env,
-        seed: BytesN<32>,
-        player: Address,
-    ) -> NebulaLayout {
+    pub fn generate_nebula_layout(env: Env, seed: BytesN<32>, player: Address) -> NebulaLayout {
         player.require_auth();
         nebula_explorer::generate_nebula_layout(&env, &seed, &player)
     }
@@ -44,11 +58,7 @@ impl NebulaNomadContract {
 
     /// Full scan: generates layout, calculates rarity, and emits a
     /// `NebulaScanned` event containing the layout hash.
-    pub fn scan_nebula(
-        env: Env,
-        seed: BytesN<32>,
-        player: Address,
-    ) -> (NebulaLayout, Rarity) {
+    pub fn scan_nebula(env: Env, seed: BytesN<32>, player: Address) -> (NebulaLayout, Rarity) {
         player.require_auth();
 
         let layout = nebula_explorer::generate_nebula_layout(&env, &seed, &player);
@@ -118,5 +128,85 @@ impl NebulaNomadContract {
     ) -> Result<DexOffer, HarvestError> {
         resource_minter::auto_list_on_dex(&env, &resource, min_price)
     }
-}
 
+    // ─── DEX Integration (Issue #9) ──────────────────────────────────────
+
+    /// Harvest resources and immediately list on DEX.
+    pub fn harvest_and_list(
+        env: Env,
+        player: Address,
+        ship_id: u64,
+        layout: NebulaLayout,
+        resource: Symbol,
+        min_price: i128,
+    ) -> Result<(HarvestResult, DexOffer), HarvestError> {
+        dex_integration::harvest_and_list(&env, &player, ship_id, &layout, &resource, min_price)
+    }
+
+    /// Cancel an active DEX listing.
+    pub fn cancel_listing(
+        env: Env,
+        owner: Address,
+        offer_id: u64,
+    ) -> Result<DexOffer, HarvestError> {
+        dex_integration::cancel_listing(&env, &owner, offer_id)
+    }
+
+    // ─── Treasure Vault (Issue #18) ──────────────────────────────────────
+
+    /// Deposit resources into a time-locked treasure vault.
+    pub fn deposit_treasure(
+        env: Env,
+        owner: Address,
+        ship_id: u64,
+        amount: u64,
+    ) -> Result<TreasureVault, VaultError> {
+        treasure_vault::deposit_treasure(&env, &owner, ship_id, amount)
+    }
+
+    /// Claim a treasure vault after the lock period expires.
+    pub fn claim_treasure(env: Env, owner: Address, vault_id: u64) -> Result<u64, VaultError> {
+        treasure_vault::claim_treasure(&env, &owner, vault_id)
+    }
+
+    /// Read a vault by ID.
+    pub fn get_vault(env: Env, vault_id: u64) -> Option<TreasureVault> {
+        treasure_vault::get_vault(&env, vault_id)
+    }
+
+    // ─── Difficulty Scaling (Issue #26) ──────────────────────────────────
+
+    /// Calculate difficulty scaling for a player level.
+    pub fn calculate_difficulty(
+        env: Env,
+        player_level: u32,
+    ) -> Result<DifficultyResult, DifficultyError> {
+        difficulty_scaler::calculate_difficulty(&env, player_level)
+    }
+
+    /// Apply difficulty scaling to a layout's anomaly count.
+    pub fn apply_scaling_to_layout(
+        env: Env,
+        base_anomaly_count: u32,
+        player_level: u32,
+    ) -> Result<u32, DifficultyError> {
+        difficulty_scaler::apply_scaling_to_layout(&env, base_anomaly_count, player_level)
+    }
+
+    // ─── Randomness Oracle (Issue #28) ───────────────────────────────────
+
+    /// Request a ledger-mixed random seed.
+    pub fn request_random_seed(env: Env) -> BytesN<32> {
+        randomness_oracle::request_random_seed(&env)
+    }
+
+    /// Validate a seed or fall back to previous block hash.
+    pub fn verify_and_fallback(env: Env, seed: BytesN<32>) -> Result<BytesN<32>, OracleError> {
+        randomness_oracle::verify_and_fallback(&env, &seed)
+    }
+
+    /// Get the current entropy pool.
+    pub fn get_entropy_pool(env: Env) -> Vec<BytesN<32>> {
+        randomness_oracle::get_entropy_pool(&env)
+    }
+}
