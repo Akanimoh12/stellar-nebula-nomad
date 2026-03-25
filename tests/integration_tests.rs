@@ -4,7 +4,7 @@ use soroban_sdk::testutils::{Address as _, Events, Ledger, LedgerInfo};
 use soroban_sdk::{vec, Address, Bytes, BytesN, Env, Symbol, Vec};
 use stellar_nebula_nomad::{
     CellType, NebulaNomadContract, NebulaNomadContractClient, NebulaCell, NebulaLayout,
-    ProfileError, ProgressUpdate, Rarity, ShipError, GRID_SIZE, TOTAL_CELLS,
+    ProfileError, ProgressUpdate, Rarity, Session, SessionError, ShipError, GRID_SIZE, TOTAL_CELLS,
 };
 
 use proptest::prelude::*;
@@ -281,7 +281,6 @@ fn test_scan_nebula_consistency_with_individual_calls() {
     assert_eq!(rarity, scan_rarity);
 }
 
-<<<<<<< HEAD
 use stellar_nebula_nomad::resource_minter::{
     ResourceError, ResourceMinter, ResourceMinterClient, ResourceType, LEDGERS_PER_DAY,
 };
@@ -656,7 +655,7 @@ fn test_double_init_rejected() {
     );
     assert_eq!(err, Err(Ok(ResourceError::AlreadyInitialized)));
 }
-=======
+
 // ─── player profile (issue #15) ───────────────────────────────────────────────
 
 #[test]
@@ -763,4 +762,79 @@ fn test_profile_emits_nomad_joined_event() {
     assert!(!events.is_empty());
 }
 
->>>>>>> 2313d34 (feat: implement player profile and progress tracker)
+
+// ─── session manager (issue #16) ──────────────────────────────────────────────
+
+#[test]
+fn test_start_session_success() {
+    let (env, client, player) = setup_env();
+    let session_id = client.start_session(&player, &42u64);
+    assert_eq!(session_id, 1);
+}
+
+#[test]
+fn test_start_session_records_expiry() {
+    let (env, client, player) = setup_env();
+    let session_id = client.start_session(&player, &1u64);
+    let session = client.get_session(&session_id);
+    assert_eq!(session.started_at, 1_700_000_000);
+    assert_eq!(session.expires_at, 1_700_000_000 + 86_400);
+    assert!(session.active);
+}
+
+#[test]
+fn test_start_multiple_sessions_up_to_limit() {
+    let (env, client, player) = setup_env();
+    client.start_session(&player, &1u64);
+    client.start_session(&player, &2u64);
+    let id3 = client.start_session(&player, &3u64);
+    assert_eq!(id3, 3);
+}
+
+#[test]
+#[should_panic]
+fn test_start_session_exceeds_limit_panics() {
+    let (env, client, player) = setup_env();
+    client.start_session(&player, &1u64);
+    client.start_session(&player, &2u64);
+    client.start_session(&player, &3u64);
+    client.start_session(&player, &4u64); // 4th session — must panic
+}
+
+#[test]
+fn test_expire_session_by_owner() {
+    let (env, client, player) = setup_env();
+    let id = client.start_session(&player, &1u64);
+    client.expire_session(&player, &id);
+    let session = client.get_session(&id);
+    assert!(!session.active);
+}
+
+#[test]
+fn test_expire_session_frees_slot_for_new_session() {
+    let (env, client, player) = setup_env();
+    client.start_session(&player, &1u64);
+    client.start_session(&player, &2u64);
+    let id3 = client.start_session(&player, &3u64);
+    client.expire_session(&player, &id3);
+    // slot freed — fourth session should succeed now
+    let id4 = client.start_session(&player, &4u64);
+    assert_eq!(id4, 4);
+}
+
+#[test]
+#[should_panic]
+fn test_expire_already_expired_session_panics() {
+    let (env, client, player) = setup_env();
+    let id = client.start_session(&player, &1u64);
+    client.expire_session(&player, &id);
+    client.expire_session(&player, &id); // already inactive — must panic
+}
+
+#[test]
+fn test_session_emits_started_event() {
+    let (env, client, player) = setup_env();
+    client.start_session(&player, &1u64);
+    let events = env.events().all();
+    assert!(!events.is_empty());
+}
