@@ -1,11 +1,13 @@
 #![cfg(test)]
 
 use soroban_sdk::testutils::{Address as _, Events, Ledger, LedgerInfo};
-use soroban_sdk::{vec, Address, BytesN, Env, IntoVal, Val, Vec};
+use soroban_sdk::{vec, Address, Bytes, BytesN, Env, Symbol, Vec};
 use stellar_nebula_nomad::{
-    CellType, NebulaNomadContract, NebulaNomadContractClient, NebulaCell, NebulaLayout, Rarity,
-    GRID_SIZE, TOTAL_CELLS,
+    CellType, NebulaNomadContract, NebulaNomadContractClient, NebulaCell,
+    NebulaLayout, Rarity, ShipError, GRID_SIZE, TOTAL_CELLS,
 };
+
+use proptest::prelude::*;
 
 fn setup_env() -> (Env, NebulaNomadContractClient<'static>, Address) {
     let env = Env::default();
@@ -20,7 +22,7 @@ fn setup_env() -> (Env, NebulaNomadContractClient<'static>, Address) {
         min_persistent_entry_ttl: 1000,
         max_entry_ttl: 10_000,
     });
-    let contract_id = env.register_contract(None, NebulaNomadContract);
+    let contract_id = env.register(NebulaNomadContract, ());
     let client = NebulaNomadContractClient::new(&env, &contract_id);
     let player = Address::generate(&env);
     (env, client, player)
@@ -71,7 +73,7 @@ fn test_different_seeds_produce_different_layouts() {
 fn test_layout_changes_with_ledger_state() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, NebulaNomadContract);
+    let contract_id = env.register(NebulaNomadContract, ());
     let client = NebulaNomadContractClient::new(&env, &contract_id);
     let player = Address::generate(&env);
     let seed = BytesN::from_array(&env, &[5u8; 32]);

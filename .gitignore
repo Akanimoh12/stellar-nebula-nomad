@@ -25,3 +25,4 @@ Cargo.lock
 
 # Soroban
 .soroban/
+test_snapshots/fuzz_*
