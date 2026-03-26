@@ -3,6 +3,7 @@
 use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, Symbol, Vec};
 
 mod blueprint_factory;
+mod gifting_system;
 mod nebula_explorer;
 mod player_profile;
 mod referral_system;
@@ -22,7 +23,7 @@ pub use nebula_explorer::{
 };
 pub use resource_minter::{
     auto_list_on_dex, harvest_resources, AssetId, DexOffer, HarvestError, HarvestResult,
-    HarvestedResource, Resource,
+    HarvestedResource, Resource, ResourceKey,
 };
 pub use ship_nft::{ShipError, ShipNft};
 pub use blueprint_factory::{Blueprint, BlueprintError, BlueprintRarity};
@@ -43,6 +44,7 @@ pub use treasure_vault::{
     claim_treasure, deposit_treasure, get_vault, TreasureVault, VaultError,
     DEFAULT_MIN_LOCK_DURATION,
 };
+pub use gifting_system::{Gift, GiftError};
 
 #[contract]
 pub struct NebulaNomadContract;
@@ -50,36 +52,27 @@ pub struct NebulaNomadContract;
 #[contractimpl]
 impl NebulaNomadContract {
     /// Generate a 16x16 procedural nebula map using ledger-seeded PRNG.
-    ///
-    /// Combines the supplied `seed` with on-chain ledger sequence and
-    /// timestamp. The player must authorize the call.
     pub fn generate_nebula_layout(env: Env, seed: BytesN<32>, player: Address) -> NebulaLayout {
         player.require_auth();
         nebula_explorer::generate_nebula_layout(&env, &seed, &player)
     }
 
-    /// Calculate the rarity tier of a nebula layout using on-chain
-    /// verifiable math (no off-chain RNG).
+    /// Calculate the rarity tier of a nebula layout.
     pub fn calculate_rarity_tier(env: Env, layout: NebulaLayout) -> Rarity {
         nebula_explorer::calculate_rarity_tier(&env, &layout)
     }
 
-    /// Full scan: generates layout, calculates rarity, and emits a
-    /// `NebulaScanned` event containing the layout hash.
+    /// Full scan: generates layout, calculates rarity, emits NebulaScanned event.
     pub fn scan_nebula(env: Env, seed: BytesN<32>, player: Address) -> (NebulaLayout, Rarity) {
         player.require_auth();
-
         let layout = nebula_explorer::generate_nebula_layout(&env, &seed, &player);
         let rarity = nebula_explorer::calculate_rarity_tier(&env, &layout);
         let layout_hash = nebula_explorer::compute_layout_hash(&env, &layout);
-
         nebula_explorer::emit_nebula_scanned(&env, &player, &layout_hash, &rarity);
-
         (layout, rarity)
     }
 
-    /// Mint a new ship NFT for `owner` with initial stats derived from
-    /// `ship_type` and optional free-form `metadata`.
+    /// Mint a new ship NFT.
     pub fn mint_ship(
         env: Env,
         owner: Address,
@@ -89,7 +82,7 @@ impl NebulaNomadContract {
         ship_nft::mint_ship(&env, &owner, &ship_type, &metadata)
     }
 
-    /// Batch-mint up to 3 ship NFTs in one transaction.
+    /// Batch-mint up to 3 ship NFTs.
     pub fn batch_mint_ships(
         env: Env,
         owner: Address,
@@ -99,7 +92,7 @@ impl NebulaNomadContract {
         ship_nft::batch_mint_ships(&env, &owner, &ship_types, &metadata)
     }
 
-    /// Transfer ship ownership to `new_owner`.
+    /// Transfer ship ownership.
     pub fn transfer_ownership(
         env: Env,
         ship_id: u64,
@@ -118,8 +111,7 @@ impl NebulaNomadContract {
         ship_nft::get_ships_by_owner(&env, &owner)
     }
 
-    /// Gas-optimized single-invocation harvest that updates balances,
-    /// emits harvest telemetry, and creates an auto-list offer hook.
+    /// Gas-optimized harvest.
     pub fn harvest_resources(
         env: Env,
         ship_id: u64,
@@ -137,8 +129,7 @@ impl NebulaNomadContract {
         resource_minter::auto_list_on_dex(&env, &resource, min_price)
     }
 
-<<<<<<< feat/game-mechanics
-    // ─── DEX Integration (Issue #9) ──────────────────────────────────────
+    // ─── DEX Integration ──────────────────────────────────────────────────
 
     /// Harvest resources and immediately list on DEX.
     pub fn harvest_and_list(
@@ -161,7 +152,7 @@ impl NebulaNomadContract {
         dex_integration::cancel_listing(&env, &owner, offer_id)
     }
 
-    // ─── Treasure Vault (Issue #18) ──────────────────────────────────────
+    // ─── Treasure Vault ───────────────────────────────────────────────────
 
     /// Deposit resources into a time-locked treasure vault.
     pub fn deposit_treasure(
@@ -183,7 +174,7 @@ impl NebulaNomadContract {
         treasure_vault::get_vault(&env, vault_id)
     }
 
-    // ─── Difficulty Scaling (Issue #26) ──────────────────────────────────
+    // ─── Difficulty Scaling ───────────────────────────────────────────────
 
     /// Calculate difficulty scaling for a player level.
     pub fn calculate_difficulty(
@@ -202,7 +193,7 @@ impl NebulaNomadContract {
         difficulty_scaler::apply_scaling_to_layout(&env, base_anomaly_count, player_level)
     }
 
-    // ─── Randomness Oracle (Issue #28) ───────────────────────────────────
+    // ─── Randomness Oracle ────────────────────────────────────────────────
 
     /// Request a ledger-mixed random seed.
     pub fn request_random_seed(env: Env) -> BytesN<32> {
@@ -217,15 +208,16 @@ impl NebulaNomadContract {
     /// Get the current entropy pool.
     pub fn get_entropy_pool(env: Env) -> Vec<BytesN<32>> {
         randomness_oracle::get_entropy_pool(&env)
-=======
-    // ─── Player Profile ───────────────────────────────────────────────────────
+    }
 
-    /// Create a new on-chain player profile. Returns the assigned profile ID.
+    // ─── Player Profile ───────────────────────────────────────────────────
+
+    /// Create a new on-chain player profile.
     pub fn initialize_profile(env: Env, owner: Address) -> Result<u64, ProfileError> {
         player_profile::initialize_profile(&env, owner)
     }
 
-    /// Update scan count and essence earned after a harvest. Owner-only.
+    /// Update scan count and essence earned after a harvest.
     pub fn update_progress(
         env: Env,
         caller: Address,
@@ -236,7 +228,7 @@ impl NebulaNomadContract {
         player_profile::update_progress(&env, caller, profile_id, scan_count, essence)
     }
 
-    /// Apply up to 5 stat updates in a single transaction for multi-scan runs.
+    /// Apply up to 5 stat updates in a single transaction.
     pub fn batch_update_progress(
         env: Env,
         caller: Address,
@@ -250,14 +242,14 @@ impl NebulaNomadContract {
         player_profile::get_profile(&env, profile_id)
     }
 
-    // ─── Session Manager ──────────────────────────────────────────────────────
+    // ─── Session Manager ──────────────────────────────────────────────────
 
-    /// Start a timed nebula exploration session for a ship. Max 3 per player.
+    /// Start a timed nebula exploration session for a ship.
     pub fn start_session(env: Env, owner: Address, ship_id: u64) -> Result<u64, SessionError> {
         session_manager::start_session(&env, owner, ship_id)
     }
 
-    /// Close a session. Owner can force-close; anyone can clean up expired ones.
+    /// Close a session.
     pub fn expire_session(
         env: Env,
         caller: Address,
@@ -271,7 +263,7 @@ impl NebulaNomadContract {
         session_manager::get_session(&env, session_id)
     }
 
-    // ─── Blueprint Factory ────────────────────────────────────────────────────
+    // ─── Blueprint Factory ────────────────────────────────────────────────
 
     /// Mint a blueprint NFT from harvested resource components.
     pub fn craft_blueprint(
@@ -306,9 +298,9 @@ impl NebulaNomadContract {
         blueprint_factory::get_blueprint(&env, blueprint_id)
     }
 
-    // ─── Referral System ──────────────────────────────────────────────────────
+    // ─── Referral System ──────────────────────────────────────────────────
 
-    /// Record an on-chain referral from `referrer` for `new_nomad`.
+    /// Record an on-chain referral.
     pub fn register_referral(
         env: Env,
         referrer: Address,
@@ -317,12 +309,12 @@ impl NebulaNomadContract {
         referral_system::register_referral(&env, referrer, new_nomad)
     }
 
-    /// Mark that `nomad` has completed their first scan, unlocking the reward.
+    /// Mark first scan completed, unlocking referral reward.
     pub fn mark_first_scan(env: Env, nomad: Address) -> Result<(), ReferralError> {
         referral_system::mark_first_scan(&env, nomad)
     }
 
-    /// Claim the essence referral reward. One-time, capped at 10 claims/day.
+    /// Claim the essence referral reward.
     pub fn claim_referral_reward(
         env: Env,
         referrer: Address,
@@ -331,9 +323,31 @@ impl NebulaNomadContract {
         referral_system::claim_referral_reward(&env, referrer, new_nomad)
     }
 
-    /// Retrieve a referral record by the new nomad's address.
+    /// Retrieve a referral record.
     pub fn get_referral(env: Env, new_nomad: Address) -> Result<Referral, ReferralError> {
         referral_system::get_referral(&env, new_nomad)
->>>>>>> main
+    }
+
+    // ─── Cross-Player Resource Gifting (#27) ──────────────────────────────
+
+    /// Send a resource gift to another player.
+    pub fn send_gift(
+        env: Env,
+        sender: Address,
+        receiver: Address,
+        resource: AssetId,
+        amount: i128,
+    ) -> Result<u64, GiftError> {
+        gifting_system::send_gift(&env, sender, receiver, resource, amount)
+    }
+
+    /// Accept a pending gift and claim the resources.
+    pub fn accept_gift(env: Env, receiver: Address, gift_id: u64) -> Result<(), GiftError> {
+        gifting_system::accept_gift(&env, receiver, gift_id)
+    }
+
+    /// Read a gift by ID.
+    pub fn get_gift(env: Env, gift_id: u64) -> Option<Gift> {
+        gifting_system::get_gift(&env, gift_id)
     }
 }

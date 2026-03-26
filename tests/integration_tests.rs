@@ -3,11 +3,9 @@
 use soroban_sdk::testutils::{Address as _, Events, Ledger, LedgerInfo};
 use soroban_sdk::{vec, Address, Bytes, BytesN, Env, Vec};
 use stellar_nebula_nomad::{
-    CellType, NebulaCell, NebulaLayout, NebulaNomadContract, NebulaNomadContractClient, Rarity,
-    GRID_SIZE, TOTAL_CELLS,
-    Blueprint, BlueprintError, BlueprintRarity, CellType, NebulaNomadContract,
-    NebulaNomadContractClient, NebulaCell, NebulaLayout, ProfileError, ProgressUpdate, Referral,
-    ReferralError, Rarity, Session, SessionError, ShipError, GRID_SIZE, TOTAL_CELLS,
+    Blueprint, BlueprintError, BlueprintRarity, CellType, Gift, GiftError, NebulaCell,
+    NebulaLayout, NebulaNomadContract, NebulaNomadContractClient, ProfileError, ProgressUpdate,
+    Rarity, Referral, ReferralError, Session, SessionError, ShipError, GRID_SIZE, TOTAL_CELLS,
 };
 
 fn setup_env() -> (Env, NebulaNomadContractClient<'static>, Address) {
