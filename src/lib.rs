@@ -849,25 +849,27 @@ impl NebulaNomadContract {
         env: Env,
         player: Address,
         gas_used: u64,
-    ) -> Result<FootprintRecord, SustainabilityError> {
-        let record = sustainability_metrics::record_transaction_footprint(&env, &player, gas_used)?;
+    ) -> FootprintRecord {
+        let record = sustainability_metrics::record_transaction_footprint(&env, &player, gas_used)
+            .unwrap();
         let mut details_bytes = [0u8; 128];
         details_bytes[0..8].copy_from_slice(&record.gas_used.to_be_bytes());
         let details = BytesN::from_array(&env, &details_bytes);
         let _ = audit_logger::log_audit_event(&env, Some(&player), symbol_short!("ec"), details);
-        Ok(record)
+        record
     }
 
     pub fn claim_sustainability_reward(
         env: Env,
         player: Address,
-    ) -> Result<i128, SustainabilityError> {
-        let reward = sustainability_metrics::claim_sustainability_reward(&env, &player)?;
+    ) -> i128 {
+        let reward = sustainability_metrics::claim_sustainability_reward(&env, &player)
+            .unwrap();
         let mut details_bytes = [0u8; 128];
         details_bytes[0..8].copy_from_slice(&(reward as i64).to_be_bytes());
         let details = BytesN::from_array(&env, &details_bytes);
         let _ = audit_logger::log_audit_event(&env, Some(&player), symbol_short!("er"), details);
-        Ok(reward)
+        reward
     }
 
     pub fn get_footprint(env: Env, player: Address) -> FootprintRecord {
@@ -880,16 +882,18 @@ impl NebulaNomadContract {
         env: Env,
         anomaly_id: u64,
         features: Vec<u32>,
-    ) -> Result<ClassificationRecord, AnomalyError> {
+    ) -> ClassificationRecord {
         anomaly_classifier::classify_anomaly(&env, anomaly_id, features)
+            .unwrap()
     }
 
     pub fn refine_classification(
         env: Env,
         anomaly_id: u64,
         new_data: Vec<u32>,
-    ) -> Result<ClassificationRecord, AnomalyError> {
+    ) -> ClassificationRecord {
         anomaly_classifier::refine_classification(&env, anomaly_id, new_data)
+            .unwrap()
     }
 
     pub fn classify_batch(
