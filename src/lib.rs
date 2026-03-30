@@ -37,6 +37,7 @@ mod audit_logger;
 mod sustainability_metrics;
 mod anomaly_classifier;
 mod shared_lib;
+mod fractional_resources;
 
 mod storage_optim;
 mod state_snapshot;
@@ -123,6 +124,14 @@ pub use audit_logger::{AuditEntry, AuditLoggerError, get_audit_count, log_audit_
 pub use sustainability_metrics::{claim_sustainability_reward, get_footprint, record_transaction_footprint, FootprintRecord, SustainabilityError};
 pub use anomaly_classifier::{classify_anomaly, classify_batch, get_classification, refine_classification, AnomalyError, ClassificationRecord};
 pub use shared_lib::{calculate_yield, validate_address, SharedError};
+
+pub use fractional_resources::{
+    initialize as initialize_fractional, fractionalize_resource, merge_fractions,
+    transfer_share, get_share, get_owner_shares, get_total_shares,
+    get_original_resource, is_share_owner, update_config as update_fractional_config,
+    FractionalShare, OriginalResource, FractionalConfig,
+    FractionalError, MAX_FRACTIONS_PER_TX, MIN_SHARE_SIZE,
+};
 
 pub use storage_optim::{
     store_with_bump, get_optimized_entry, batch_store_with_bump, guard_reentrancy,
@@ -1230,5 +1239,77 @@ impl NebulaNomadContract {
     /// Return total messages sent over a pair.
     pub fn get_message_count(env: Env, pair_id: u64) -> u64 {
         entanglement_comms::get_message_count(&env, pair_id)
+    }
+
+    // ─── Fractional Resource Ownership API (Issue #89) ────────────────────
+
+    /// Initialize the fractional resource system.
+    pub fn initialize_fractional(env: Env, admin: Address) -> Result<(), FractionalError> {
+        fractional_resources::initialize(&env, &admin)
+    }
+
+    /// Fractionalize a resource into divisible shares.
+    pub fn fractionalize_resource(
+        env: Env,
+        owner: Address,
+        resource_type: Symbol,
+        total_amount: u32,
+        shares: u32,
+    ) -> Result<Vec<u64>, FractionalError> {
+        fractional_resources::fractionalize_resource(&env, &owner, resource_type, total_amount, shares)
+    }
+
+    /// Merge fractional shares back into a whole resource.
+    pub fn merge_fractions(
+        env: Env,
+        owner: Address,
+        share_ids: Vec<u64>,
+    ) -> Result<u32, FractionalError> {
+        fractional_resources::merge_fractions(&env, &owner, share_ids)
+    }
+
+    /// Transfer a fractional share to another owner.
+    pub fn transfer_share(
+        env: Env,
+        from: Address,
+        to: Address,
+        share_id: u64,
+    ) -> Result<FractionalShare, FractionalError> {
+        fractional_resources::transfer_share(&env, &from, &to, share_id)
+    }
+
+    /// Get a fractional share by ID.
+    pub fn get_share(env: Env, share_id: u64) -> Option<FractionalShare> {
+        fractional_resources::get_share(&env, share_id)
+    }
+
+    /// Get all share IDs owned by an address.
+    pub fn get_owner_shares(env: Env, owner: Address) -> Vec<u64> {
+        fractional_resources::get_owner_shares(&env, &owner)
+    }
+
+    /// Get the total number of shares created.
+    pub fn get_total_shares(env: Env) -> u64 {
+        fractional_resources::get_total_shares(&env)
+    }
+
+    /// Get original resource data.
+    pub fn get_original_resource(env: Env, resource_type: Symbol) -> Option<OriginalResource> {
+        fractional_resources::get_original_resource(&env, resource_type)
+    }
+
+    /// Check if an address owns a specific share.
+    pub fn is_share_owner(env: Env, owner: Address, share_id: u64) -> bool {
+        fractional_resources::is_share_owner(&env, &owner, share_id)
+    }
+
+    /// Update fractionalization config (admin only).
+    pub fn update_fractional_config(
+        env: Env,
+        admin: Address,
+        min_share_size: u32,
+        max_fractions: u32,
+    ) -> Result<FractionalConfig, FractionalError> {
+        fractional_resources::update_config(&env, &admin, min_share_size, max_fractions)
     }
 }
