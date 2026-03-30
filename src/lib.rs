@@ -50,6 +50,7 @@ mod wormhole_traveler;
 mod alliance_manager;
 mod market_oracle;
 mod audio_seed_generator;
+mod privacy_stats;
 
 pub use nebula_explorer::{
     calculate_rarity_tier, compute_layout_hash, generate_nebula_layout, CellType, NebulaCell,
@@ -183,6 +184,11 @@ pub use audio_seed_generator::{
     initialize_presets, generate_music_seed, get_instrument_layer, get_all_layers,
     get_nebula_seed, get_preset, MusicSeed, InstrumentParams, AudioError,
     INSTRUMENT_PRESETS, MAX_LAYERS_PER_NEBULA,
+};
+pub use privacy_stats::{
+    opt_in_privacy, commit_private_stat, verify_private_stat, get_commitment,
+    get_commitment_count, batch_commit_stats, is_opted_in, reset_burst_counter as reset_privacy_burst,
+    StatCommitment, PrivacyError, MAX_COMMITMENTS_PER_TX,
 };
 
 #[contract]
@@ -1505,5 +1511,65 @@ impl NebulaNomadContract {
     /// Get instrument preset by ID.
     pub fn get_preset(env: Env, preset_id: u32) -> Result<InstrumentParams, AudioError> {
         audio_seed_generator::get_preset(&env, preset_id)
+    }
+
+    // ─── Privacy-Preserving Player Stats (Issue #XX) ─────────────────────
+
+    /// Opt in to privacy-preserving stat sharing.
+    pub fn opt_in_privacy(env: Env, player: Address) -> Result<(), PrivacyError> {
+        privacy_stats::opt_in_privacy(&env, player)
+    }
+
+    /// Check if a player has opted in to privacy features.
+    pub fn is_opted_in_privacy(env: Env, player: Address) -> bool {
+        privacy_stats::is_opted_in(&env, &player)
+    }
+
+    /// Commit a private stat without revealing the raw value.
+    pub fn commit_private_stat(
+        env: Env,
+        player: Address,
+        stat_type: Symbol,
+        value: i128,
+    ) -> Result<BytesN<32>, PrivacyError> {
+        privacy_stats::commit_private_stat(&env, player, stat_type, value)
+    }
+
+    /// Verify a private stat commitment using a zero-knowledge proof.
+    pub fn verify_private_stat(
+        env: Env,
+        commitment: BytesN<32>,
+        proof: BytesN<64>,
+    ) -> Result<bool, PrivacyError> {
+        privacy_stats::verify_private_stat(&env, commitment, proof)
+    }
+
+    /// Get a commitment for a player and stat type.
+    pub fn get_commitment(
+        env: Env,
+        player: Address,
+        stat_type: Symbol,
+    ) -> Result<StatCommitment, PrivacyError> {
+        privacy_stats::get_commitment(&env, player, stat_type)
+    }
+
+    /// Get total number of commitments made across all players.
+    pub fn get_commitment_count(env: Env) -> u64 {
+        privacy_stats::get_commitment_count(&env)
+    }
+
+    /// Batch commit multiple stats in a single transaction (up to 10).
+    pub fn batch_commit_stats(
+        env: Env,
+        player: Address,
+        stat_types: Vec<Symbol>,
+        values: Vec<i128>,
+    ) -> Result<Vec<BytesN<32>>, PrivacyError> {
+        privacy_stats::batch_commit_stats(&env, player, stat_types, values)
+    }
+
+    /// Reset privacy burst counter for a new transaction.
+    pub fn reset_privacy_burst_counter(env: Env) {
+        privacy_stats::reset_burst_counter(&env)
     }
 }
