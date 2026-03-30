@@ -88,6 +88,7 @@ pub use metadata_resolver::{
 pub use randomness_oracle::{
     get_entropy_pool, request_random_seed, verify_and_fallback, OracleError,
 };
+pub use mobile_views::{get_mobile_dashboard, get_quick_scan_preview, MobileDashboard, MobileViewError, QuickScanPreview};
 pub use ship_upgrade::{ShipState, ShipUpgradeError, UpgradeBlueprint};
 pub use treasure_vault::{
     claim_treasure, deposit_treasure, get_vault, TreasureVault, VaultError,
