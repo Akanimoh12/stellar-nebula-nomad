@@ -19,6 +19,8 @@ mod emergency_controls;
 mod metadata_resolver;
 mod randomness_oracle;
 pub mod ship_upgrade;
+#[cfg(any(test, feature = "fuzz"))]
+pub mod test_helpers;
 mod treasure_vault;
 
 mod yield_farming;
@@ -496,6 +498,7 @@ impl NebulaNomadContract {
         randomness_oracle::get_entropy_pool(&env)
     }
 
+    // ─── Player Profile ───────────────────────────────────────────────────────
     // ─── Player Profile ───────────────────────────────────────────────────
 
     /// Create a new on-chain player profile.
@@ -614,6 +617,41 @@ impl NebulaNomadContract {
         referral_system::get_referral(&env, new_nomad)
     }
 
+    // ─── Ship Upgrade (Issue #7) ─────────────────────────────────────────
+
+    /// Initialise the upgrade config with a blueprint map. Admin-only, once.
+    pub fn init_upgrade_config(
+        env: Env,
+        admin: Address,
+        blueprints: soroban_sdk::Map<Symbol, UpgradeBlueprint>,
+    ) -> Result<(), ShipUpgradeError> {
+        ship_upgrade::init_upgrade_config(&env, &admin, blueprints)
+    }
+
+    /// Apply a single component upgrade to a ship, burning the required
+    /// resource from the player's harvested balance.
+    pub fn apply_upgrade(
+        env: Env,
+        player: Address,
+        ship_id: u64,
+        component: Symbol,
+    ) -> Result<ShipState, ShipUpgradeError> {
+        ship_upgrade::apply_upgrade(&env, &player, ship_id, component)
+    }
+
+    /// Apply up to 2 upgrades in a single transaction.
+    pub fn batch_upgrade(
+        env: Env,
+        player: Address,
+        ship_id: u64,
+        components: Vec<Symbol>,
+    ) -> Result<Vec<ShipState>, ShipUpgradeError> {
+        ship_upgrade::batch_upgrade(&env, &player, ship_id, components)
+    }
+
+    /// Read the current upgrade state of a ship.
+    pub fn get_ship_state(env: Env, ship_id: u64) -> Option<ShipState> {
+        ship_upgrade::get_ship_state(&env, ship_id)
     // ─── Cross-Player Resource Gifting (#27) ──────────────────────────────
 
     /// Send a resource gift to another player.
