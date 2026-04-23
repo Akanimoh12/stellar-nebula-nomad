@@ -31,6 +31,10 @@ mod yield_farming;
 mod governance;
 mod theme_customizer;
 mod indexer_callbacks;
+mod difficulty_curve;
+mod health_monitor;
+mod achievement_engine;
+mod data_exporter;
 
 mod contract_versioning;
 mod gas_recovery;
@@ -93,6 +97,24 @@ pub use dex_integration::{cancel_listing, harvest_and_list};
 pub use difficulty_scaler::{
     apply_scaling_to_layout, calculate_difficulty, DifficultyError, DifficultyResult,
     RarityWeights, MAX_LEVEL,
+};
+pub use difficulty_curve::{
+    adjust_curve_parameter, apply_curve_to_layout, calculate_progressive_difficulty, CurveConfig,
+    CurveError, ProgressiveDifficulty,
+};
+pub use health_monitor::{
+    get_health_summary, record_contract_health, record_contract_health_batch, HealthError,
+    HealthMetricInput, HealthMetricSummary, HealthSummary,
+};
+pub use achievement_engine::{
+    batch_unlock_achievements, check_achievement_progress, get_player_achievement_count,
+    get_player_badges, unlock_achievement, AchievementBadge, AchievementError,
+    AchievementProgress, AchievementTemplate,
+};
+pub use data_exporter::{
+    batch_export_players, export_player_data, get_export_session, get_export_settings,
+    set_export_compression, set_export_opt_in, ExportError, ExportRecord, ExportSession,
+    ExportSettings,
 };
 pub use emergency_controls::{
     EmergencyError, execute_unpause, get_admins, initialize_admins, is_paused,
@@ -524,6 +546,139 @@ impl NebulaNomadContract {
         player_level: u32,
     ) -> Result<u32, DifficultyError> {
         difficulty_scaler::apply_scaling_to_layout(&env, base_anomaly_count, player_level)
+    }
+
+    // ─── Dynamic Difficulty Curve ──────────────────────────────────────────
+
+    /// Calculate progressive nebula difficulty for a player level.
+    pub fn calculate_progressive_difficulty(
+        env: Env,
+        player_level: u32,
+    ) -> Result<ProgressiveDifficulty, CurveError> {
+        difficulty_curve::calculate_progressive_difficulty(&env, player_level)
+    }
+
+    /// Admin-tune a curve parameter during the tuning window.
+    pub fn adjust_curve_parameter(
+        env: Env,
+        admin: Address,
+        param: Symbol,
+        value: i128,
+    ) -> Result<CurveConfig, CurveError> {
+        difficulty_curve::adjust_curve_parameter(&env, &admin, param, value)
+    }
+
+    /// Read the active curve configuration.
+    pub fn get_curve_config(env: Env) -> CurveConfig {
+        difficulty_curve::get_curve_config(&env)
+    }
+
+    // ─── Contract Health Monitoring ───────────────────────────────────────
+
+    /// Record a single health metric.
+    pub fn record_contract_health(
+        env: Env,
+        metric: Symbol,
+        value: u64,
+    ) -> HealthMetricSummary {
+        health_monitor::record_contract_health(&env, metric, value)
+    }
+
+    /// Record a burst of health metrics.
+    pub fn record_contract_health_batch(
+        env: Env,
+        metrics: Vec<HealthMetricInput>,
+    ) -> Result<Vec<HealthMetricSummary>, HealthError> {
+        health_monitor::record_contract_health_batch(&env, metrics)
+    }
+
+    /// Return the current health summary.
+    pub fn get_health_summary(env: Env) -> HealthSummary {
+        health_monitor::get_health_summary(&env)
+    }
+
+    // ─── Achievement Engine ───────────────────────────────────────────────
+
+    /// Unlock an achievement and mint a badge.
+    pub fn unlock_achievement(
+        env: Env,
+        player: Address,
+        achievement_id: u64,
+    ) -> Result<AchievementBadge, AchievementError> {
+        achievement_engine::unlock_achievement(&env, player, achievement_id)
+    }
+
+    /// Batch unlock up to five achievements.
+    pub fn batch_unlock_achievements(
+        env: Env,
+        player: Address,
+        achievement_ids: Vec<u64>,
+    ) -> Result<Vec<AchievementBadge>, AchievementError> {
+        achievement_engine::batch_unlock_achievements(&env, player, achievement_ids)
+    }
+
+    /// Return completion status for all predefined achievements.
+    pub fn check_achievement_progress(
+        env: Env,
+        player: Address,
+    ) -> Result<Vec<AchievementProgress>, AchievementError> {
+        achievement_engine::check_achievement_progress(&env, player)
+    }
+
+    /// Count unlocked achievements for a player.
+    pub fn get_player_achievement_count(
+        env: Env,
+        player: Address,
+    ) -> Result<u32, AchievementError> {
+        achievement_engine::get_player_achievement_count(&env, player)
+    }
+
+    /// Return the player's minted achievement badges.
+    pub fn get_player_badges(env: Env, player: Address) -> Vec<AchievementBadge> {
+        achievement_engine::get_player_badges(&env, player)
+    }
+
+    // ─── Data Exporter ────────────────────────────────────────────────────
+
+    /// Opt a player into export sharing.
+    pub fn set_export_opt_in(
+        env: Env,
+        player: Address,
+        enabled: bool,
+    ) -> Result<ExportSettings, ExportError> {
+        data_exporter::set_export_opt_in(&env, player, enabled)
+    }
+
+    /// Toggle compact export payloads for a player.
+    pub fn set_export_compression(
+        env: Env,
+        player: Address,
+        compressed: bool,
+    ) -> Result<ExportSettings, ExportError> {
+        data_exporter::set_export_compression(&env, player, compressed)
+    }
+
+    /// Export a single player's stats payload.
+    pub fn export_player_data(env: Env, player: Address) -> Result<Bytes, ExportError> {
+        data_exporter::export_player_data(&env, player)
+    }
+
+    /// Paginate opted-in players and export their payloads.
+    pub fn batch_export_players(
+        env: Env,
+        limit: u32,
+    ) -> Result<Vec<ExportRecord>, ExportError> {
+        data_exporter::batch_export_players(&env, limit)
+    }
+
+    /// Return the active export session.
+    pub fn get_export_session(env: Env) -> ExportSession {
+        data_exporter::get_export_session(&env)
+    }
+
+    /// Return the export settings for a player.
+    pub fn get_export_settings(env: Env, player: Address) -> ExportSettings {
+        data_exporter::get_export_settings(&env, player)
     }
 
     // ─── Randomness Oracle ────────────────────────────────────────────────

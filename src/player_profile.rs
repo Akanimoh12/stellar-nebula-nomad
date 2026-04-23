@@ -201,3 +201,32 @@ pub fn get_profile(env: &Env, profile_id: u64) -> Result<PlayerProfile, ProfileE
         .get(&ProfileKey::Profile(profile_id))
         .ok_or(ProfileError::ProfileNotFound)
 }
+
+/// Retrieve a player profile by owner address.
+pub fn get_profile_by_owner(env: &Env, owner: &Address) -> Result<PlayerProfile, ProfileError> {
+    let profile_id: u64 = env
+        .storage()
+        .persistent()
+        .get(&ProfileKey::OwnerProfile(owner.clone()))
+        .ok_or(ProfileError::ProfileNotFound)?;
+
+    get_profile(env, profile_id)
+}
+
+/// Mark an achievement flag on a profile.
+pub fn mark_achievement_unlocked(
+    env: &Env,
+    profile_id: u64,
+    achievement_id: u64,
+) -> Result<(), ProfileError> {
+    let mut profile = get_profile(env, profile_id)?;
+    if achievement_id > 0 && achievement_id <= 32 {
+        profile.achievement_flags |= 1u32 << ((achievement_id - 1) as u32);
+    }
+
+    env.storage()
+        .persistent()
+        .set(&ProfileKey::Profile(profile_id), &profile);
+
+    Ok(())
+}
