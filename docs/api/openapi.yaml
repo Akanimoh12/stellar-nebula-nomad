@@ -1,0 +1,900 @@
+openapi: "3.0.3"
+info:
+  title: Stellar Nebula Nomad — Contract API
+  version: "1.0.0"
+  description: |
+    Auto-generated OpenAPI 3.0 specification for the **Stellar Nebula Nomad**
+    Soroban smart contract deployed on the Stellar network.
+
+    All operations are Soroban contract invocations submitted via the
+    Stellar RPC endpoint using `stellar contract invoke` or the
+    JavaScript / Rust SDK helpers.
+
+    ## Authentication
+
+    Every mutating operation requires the caller to provide a valid Stellar
+    keypair signature.  The `caller` parameter must be the transaction
+    source account, and the contract SDK enforces `caller.require_auth()`.
+
+    ## Rate Limiting
+
+    There are no protocol-level rate limits; Stellar's fee market provides
+    natural congestion control.  Clients should honour a soft limit of
+    **10 contract calls per ledger** (≈ 50 calls / second) to avoid surge
+    fees.
+
+    ## Error Codes
+
+    | Code | Name                   | Description                                         |
+    |------|------------------------|-----------------------------------------------------|
+    | 1    | AlreadyExists          | Resource already exists (profile, bond, etc.)       |
+    | 2    | NotFound               | Requested resource was not found                    |
+    | 3    | Unauthorized           | Caller is not authorized for this action            |
+    | 4    | BatchTooLarge          | Batch size exceeds the per-call limit               |
+    | 5    | IncompatibleVersion    | Target version is not supported                     |
+    | 6    | AlreadyMigrated        | Migration already completed for this version pair   |
+    | 7    | MigrationInProgress    | Migration is still in progress                      |
+    | 8    | AlreadyUnlocked        | Achievement has already been unlocked               |
+    | 9    | TemplateNotFound       | Achievement template not found in catalog           |
+    | 10   | NotEligible            | Player does not meet achievement criteria           |
+    | 11   | BadgeNotFound          | Badge NFT does not exist                            |
+    | 12   | NonTransferable        | Badge is soul-bound and cannot be transferred       |
+    | 13   | NoPendingUpgrade       | No upgrade has been authorized yet                  |
+    | 14   | NoRollbackTarget       | No previous version to roll back to                 |
+
+  contact:
+    name: Space-Nebula
+    url: https://github.com/Space-Nebula/stellar-nebula-nomad
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://soroban-testnet.stellar.org
+    description: Stellar Testnet RPC
+  - url: https://soroban-mainnet.stellar.org
+    description: Stellar Mainnet RPC
+
+tags:
+  - name: Nebula
+    description: Nebula layout generation and scanning
+  - name: Player
+    description: Player profile management
+  - name: Ship
+    description: Ship NFT minting and management
+  - name: Achievements
+    description: Achievement tracking, unlocking, and leaderboard
+  - name: Badges
+    description: Badge NFT minting and display metadata
+  - name: Proxy
+    description: Upgradeable contract administration
+  - name: Resources
+    description: Resource harvesting and yield farming
+  - name: Governance
+    description: On-chain governance proposals
+
+paths:
+
+  # ── Nebula ────────────────────────────────────────────────────────────────────
+
+  /nebula/generate:
+    post:
+      tags: [Nebula]
+      operationId: generateNebulaLayout
+      summary: Generate a deterministic nebula grid
+      description: |
+        Generates a 16×16 procedural nebula layout seeded from the supplied
+        `seed` bytes.  Returns the full `NebulaLayout` including all 256 cells,
+        total energy, and the layout hash.
+
+        **Example:**
+        ```sh
+        stellar contract invoke \
+          --id $CONTRACT_ID \
+          --source-account $SOURCE \
+          -- generate_nebula_layout \
+          --seed $(echo -n "myseed" | xxd -p)
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seed]
+              properties:
+                seed:
+                  $ref: '#/components/schemas/BytesN32'
+      responses:
+        "200":
+          description: Nebula layout generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NebulaLayout'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /nebula/rarity:
+    post:
+      tags: [Nebula]
+      operationId: calculateRarityTier
+      summary: Calculate the rarity tier for a cell energy value
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [energy]
+              properties:
+                energy:
+                  type: integer
+                  format: int64
+      responses:
+        "200":
+          description: Rarity tier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rarity'
+
+  # ── Player ────────────────────────────────────────────────────────────────────
+
+  /player/initialize:
+    post:
+      tags: [Player]
+      operationId: initializeProfile
+      summary: Create a new player profile
+      description: |
+        Creates an on-chain player profile for `owner`.  The caller must sign
+        the transaction as `owner`.
+
+        **Error codes:** `1` (AlreadyExists)
+
+        **Example:**
+        ```sh
+        stellar contract invoke \
+          --id $CONTRACT_ID \
+          --source-account $PLAYER \
+          -- initialize_profile \
+          --owner $PLAYER
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner]
+              properties:
+                owner:
+                  $ref: '#/components/schemas/Address'
+      responses:
+        "200":
+          description: New profile ID
+          content:
+            application/json:
+              schema:
+                type: integer
+                format: int64
+        "409":
+          $ref: '#/components/responses/Conflict'
+
+  /player/profile:
+    get:
+      tags: [Player]
+      operationId: getProfileByOwner
+      summary: Fetch a player profile by owner address
+      parameters:
+        - name: owner
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/Address'
+      responses:
+        "200":
+          description: Player profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerProfile'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ── Ship ──────────────────────────────────────────────────────────────────────
+
+  /ship/mint:
+    post:
+      tags: [Ship]
+      operationId: mintShip
+      summary: Mint a new ship NFT
+      description: |
+        Mints a single ship NFT of the given type for `owner`.  Ship types:
+        `fighter`, `explorer`, `hauler`.
+
+        **Example:**
+        ```sh
+        stellar contract invoke \
+          --id $CONTRACT_ID \
+          --source-account $PLAYER \
+          -- mint_ship \
+          --owner $PLAYER \
+          --ship_type explorer \
+          --metadata ""
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner, ship_type]
+              properties:
+                owner:
+                  $ref: '#/components/schemas/Address'
+                ship_type:
+                  type: string
+                  enum: [fighter, explorer, hauler]
+                  example: explorer
+                metadata:
+                  type: string
+                  description: Hex-encoded optional metadata bytes
+      responses:
+        "200":
+          description: Minted ship NFT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipNft'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /ship/{id}:
+    get:
+      tags: [Ship]
+      operationId: getShip
+      summary: Fetch a ship by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Ship NFT record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipNft'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ── Achievements ──────────────────────────────────────────────────────────────
+
+  /achievements/progress:
+    get:
+      tags: [Achievements]
+      operationId: checkAchievementProgress
+      summary: Get all achievement progress for a player
+      description: |
+        Returns a list of progress snapshots for every achievement in the
+        catalog.  Each entry includes the percentage complete, whether the
+        player is eligible to unlock, and whether it has already been unlocked.
+
+        **Example:**
+        ```sh
+        stellar contract invoke \
+          --id $CONTRACT_ID \
+          -- check_achievement_progress \
+          --player $PLAYER
+        ```
+      parameters:
+        - name: player
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/Address'
+      responses:
+        "200":
+          description: List of progress snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AchievementProgress'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /achievements/unlock:
+    post:
+      tags: [Achievements]
+      operationId: unlockAchievement
+      summary: Unlock an achievement and mint a badge
+      description: |
+        Unlocks an achievement for the caller if they meet the criteria.
+        Mints a badge NFT and emits an `ach_unlck` event.
+
+        **Error codes:** `8` (AlreadyUnlocked), `10` (NotEligible),
+        `2` (ProfileNotFound), `9` (TemplateNotFound)
+
+        **Example:**
+        ```sh
+        stellar contract invoke \
+          --id $CONTRACT_ID \
+          --source-account $PLAYER \
+          -- unlock_achievement \
+          --player $PLAYER \
+          --achievement_id 1
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [player, achievement_id]
+              properties:
+                player:
+                  $ref: '#/components/schemas/Address'
+                achievement_id:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  maximum: 20
+                  example: 1
+      responses:
+        "200":
+          description: Minted badge record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementBadge'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "409":
+          $ref: '#/components/responses/Conflict'
+
+  /achievements/batch-unlock:
+    post:
+      tags: [Achievements]
+      operationId: batchUnlockAchievements
+      summary: Unlock multiple achievements in a single call (max 5)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [player, achievement_ids]
+              properties:
+                player:
+                  $ref: '#/components/schemas/Address'
+                achievement_ids:
+                  type: array
+                  maxItems: 5
+                  items:
+                    type: integer
+                    format: int64
+      responses:
+        "200":
+          description: List of minted badges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AchievementBadge'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /achievements/leaderboard:
+    get:
+      tags: [Achievements]
+      operationId: leaderboardTop
+      summary: Return the top-10 achievement leaderboard
+      responses:
+        "200":
+          description: Top-10 leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 10
+                items:
+                  $ref: '#/components/schemas/LeaderboardEntry'
+
+  # ── Badges ────────────────────────────────────────────────────────────────────
+
+  /badges/{badge_id}:
+    get:
+      tags: [Badges]
+      operationId: getBadgeMetadata
+      summary: Fetch full display metadata for a badge NFT
+      description: |
+        Returns the [`BadgeMetadata`] record including image URI, rarity tier,
+        title, description, and provenance data.
+      parameters:
+        - name: badge_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Badge metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadgeMetadata'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /badges/mint:
+    post:
+      tags: [Badges]
+      operationId: mintBadge
+      summary: Attach display metadata to a minted badge
+      description: |
+        After an achievement unlock creates the base badge record, call this
+        to attach the full [`BadgeMetadata`] (image URI, description).
+
+        **Example:**
+        ```sh
+        stellar contract invoke \
+          --id $CONTRACT_ID \
+          --source-account $ADMIN \
+          -- mint_badge \
+          --badge_id 1 \
+          --description "First scan of the nebula" \
+          --image_uri "ipfs://QmXyz..."
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [badge_id, description, image_uri]
+              properties:
+                badge_id:
+                  type: integer
+                  format: int64
+                description:
+                  type: string
+                image_uri:
+                  type: string
+                  example: "ipfs://QmXyz..."
+      responses:
+        "200":
+          description: Full badge metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadgeMetadata'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /badges/transfer:
+    post:
+      tags: [Badges]
+      operationId: transferBadge
+      summary: Transfer a transferable badge to another player
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to, badge_id]
+              properties:
+                from:
+                  $ref: '#/components/schemas/Address'
+                to:
+                  $ref: '#/components/schemas/Address'
+                badge_id:
+                  type: integer
+                  format: int64
+      responses:
+        "200":
+          description: Transfer successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /badges/owner/{player}:
+    get:
+      tags: [Badges]
+      operationId: listBadgesByOwner
+      summary: List all badge IDs held by a player
+      parameters:
+        - name: player
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Address'
+      responses:
+        "200":
+          description: Array of badge IDs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+                  format: int64
+
+  # ── Proxy / Upgrade ───────────────────────────────────────────────────────────
+
+  /proxy/initialize:
+    post:
+      tags: [Proxy]
+      operationId: proxyInitialize
+      summary: Initialize the upgradeable proxy with an admin address
+      description: |
+        Must be called once at contract deployment.  Sets the admin address
+        and initializes the version counter to `1`.
+
+        **Error codes:** `2` (AlreadyInitialized)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [admin]
+              properties:
+                admin:
+                  $ref: '#/components/schemas/Address'
+      responses:
+        "200":
+          description: Proxy initialized
+        "409":
+          $ref: '#/components/responses/Conflict'
+
+  /proxy/authorize-upgrade:
+    post:
+      tags: [Proxy]
+      operationId: authorizeUpgrade
+      summary: Propose a new Wasm hash for upgrade (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_wasm_hash]
+              properties:
+                new_wasm_hash:
+                  $ref: '#/components/schemas/BytesN32'
+      responses:
+        "200":
+          description: Upgrade authorized
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /proxy/execute-upgrade:
+    post:
+      tags: [Proxy]
+      operationId: executeUpgrade
+      summary: Execute the pending upgrade (admin only)
+      description: |
+        Installs the Wasm hash that was previously authorized via
+        `authorize_upgrade`.  Bumps the version counter.
+
+        **Error codes:** `13` (NoPendingUpgrade)
+      responses:
+        "200":
+          description: New version number
+          content:
+            application/json:
+              schema:
+                type: integer
+                description: New version number after upgrade
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /proxy/rollback:
+    post:
+      tags: [Proxy]
+      operationId: rollbackUpgrade
+      summary: Rollback to the previous Wasm version (admin only)
+      description: |
+        Reverts to the Wasm installed before the most recent upgrade.
+
+        > **Warning:** state migrations are NOT automatically reversed.
+        > See `UPGRADE_GUIDE.md` before rolling back.
+
+        **Error codes:** `14` (NoRollbackTarget)
+      responses:
+        "200":
+          description: Version after rollback
+          content:
+            application/json:
+              schema:
+                type: integer
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /proxy/migrate:
+    post:
+      tags: [Proxy]
+      operationId: runMigration
+      summary: Run one batch of the post-upgrade data migration (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [batch_size]
+              properties:
+                batch_size:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+      responses:
+        "200":
+          description: "`true` if migration is complete, `false` if more batches are needed"
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /proxy/history:
+    get:
+      tags: [Proxy]
+      operationId: getUpgradeHistory
+      summary: Return the full upgrade history log
+      responses:
+        "200":
+          description: List of upgrade records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UpgradeRecord'
+
+  /proxy/version:
+    get:
+      tags: [Proxy]
+      operationId: getVersion
+      summary: Return the current contract version number
+      responses:
+        "200":
+          description: Current version
+          content:
+            application/json:
+              schema:
+                type: integer
+                example: 1
+
+components:
+  schemas:
+
+    Address:
+      type: string
+      description: Stellar account or contract address (G… or C… format)
+      example: "GAHJJJKMOKYE4RVPZEWZTKH5FVI4PA3VL7GK2LFNUBSGBV4HAODLYJL"
+
+    BytesN32:
+      type: string
+      description: 32-byte value as a 64-character hex string
+      pattern: '^[0-9a-fA-F]{64}$'
+      example: "a1b2c3d4e5f60708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+
+    Rarity:
+      type: string
+      enum: [Common, Uncommon, Rare, Epic, Legendary]
+      example: Rare
+
+    NebulaCell:
+      type: object
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+        cell_type:
+          type: string
+          enum: [Empty, Star, Asteroid, GasCloud, DarkMatter, ExoticMatter, StellarDust, Wormhole]
+        energy:
+          type: integer
+
+    NebulaLayout:
+      type: object
+      properties:
+        width:
+          type: integer
+          example: 16
+        height:
+          type: integer
+          example: 16
+        cells:
+          type: array
+          items:
+            $ref: '#/components/schemas/NebulaCell'
+        seed:
+          $ref: '#/components/schemas/BytesN32'
+        timestamp:
+          type: integer
+          format: int64
+        total_energy:
+          type: integer
+
+    PlayerProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        owner:
+          $ref: '#/components/schemas/Address'
+        total_scans:
+          type: integer
+        essence_earned:
+          type: integer
+          format: int64
+        ship_id:
+          type: integer
+          format: int64
+        achievement_flags:
+          type: integer
+          description: Bitmask of unlocked achievement flags
+        created_at:
+          type: integer
+          format: int64
+        last_updated:
+          type: integer
+          format: int64
+
+    ShipNft:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        owner:
+          $ref: '#/components/schemas/Address'
+        ship_type:
+          type: string
+          enum: [fighter, explorer, hauler]
+        hull:
+          type: integer
+        scanner_power:
+          type: integer
+        metadata:
+          type: string
+          description: Hex-encoded metadata bytes
+
+    AchievementProgress:
+      type: object
+      properties:
+        achievement_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        unlocked:
+          type: boolean
+        eligible:
+          type: boolean
+        progress_pct:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    AchievementBadge:
+      type: object
+      properties:
+        badge_id:
+          type: integer
+          format: int64
+        achievement_id:
+          type: integer
+          format: int64
+        owner:
+          $ref: '#/components/schemas/Address'
+        title:
+          type: string
+        minted_at:
+          type: integer
+          format: int64
+        transferable:
+          type: boolean
+
+    BadgeMetadata:
+      type: object
+      properties:
+        badge_id:
+          type: integer
+          format: int64
+        achievement_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        image_uri:
+          type: string
+          example: "ipfs://QmXyz..."
+        rarity_tier:
+          type: integer
+          minimum: 0
+          maximum: 4
+          description: "0=Common, 1=Uncommon, 2=Rare, 3=Epic, 4=Legendary"
+        minted_at:
+          type: integer
+          format: int64
+        original_owner:
+          $ref: '#/components/schemas/Address'
+        transferable:
+          type: boolean
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        player:
+          $ref: '#/components/schemas/Address'
+        achievement_count:
+          type: integer
+
+    UpgradeRecord:
+      type: object
+      properties:
+        version:
+          type: integer
+        wasm_hash:
+          $ref: '#/components/schemas/BytesN32'
+        upgraded_at:
+          type: integer
+          description: Ledger sequence number
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+
+  responses:
+
+    BadRequest:
+      description: Invalid input or business rule violation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Conflict:
+      description: Resource already exists or duplicate operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Caller is not authorized to perform this action
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

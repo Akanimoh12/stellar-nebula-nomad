@@ -62,6 +62,24 @@
 
 ---
 
+## 📖 API Documentation
+
+The full contract API is documented in the OpenAPI 3.0 spec:
+
+- **Interactive Swagger UI**: [`docs/api/swagger-ui/index.html`](docs/api/swagger-ui/index.html)
+- **Static Redoc Reference**: [`docs/api/index.html`](docs/api/index.html)
+- **OpenAPI YAML Source**: [`docs/api/openapi.yaml`](docs/api/openapi.yaml)
+
+To generate documentation locally:
+
+```bash
+./scripts/generate-docs.sh
+# Or serve interactively:
+./scripts/generate-docs.sh --serve
+```
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites

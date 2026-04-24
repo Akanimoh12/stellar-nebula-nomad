@@ -78,6 +78,13 @@ mod nebula_archive;
 mod soul_binding;
 mod offline_progress;
 
+// ── Issue #119: On-chain achievements and badges ──────────────────────────────
+mod achievements;
+mod badges;
+
+// ── Issues #113 / #114: Upgradeable contract pattern ─────────────────────────
+mod proxy;
+
 pub use nebula_explorer::{
     calculate_rarity_tier, compute_layout_hash, generate_nebula_layout, CellType, NebulaCell,
     NebulaLayout, Rarity, GRID_SIZE, TOTAL_CELLS,
