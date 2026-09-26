@@ -34,6 +34,7 @@ mod pvp_combat;
 pub mod events;
 mod batch_processor;
 mod dex_integration;
+pub mod dynamic_pricing;
 mod difficulty_scaler;
 mod difficulty_curve;
 mod health_monitor;
@@ -45,6 +46,7 @@ mod randomness_oracle;
 pub mod rate_limiter;
 pub mod nebula_gen;
 pub mod ship_upgrade;
+pub mod ship_repair;
 #[cfg(any(test, feature = "fuzz"))]
 pub mod test_helpers;
 mod treasure_vault;
@@ -150,7 +152,7 @@ pub use resource_minter::{
     resource_type_to_symbol, total_minted, AssetId, MinterError, MinterKey, ResourceKey,
     ResourceMinterContract, ResourceRecord, ResourceType,
 };
-pub use ship_nft::{ShipError, ShipNft};
+pub use ship_nft::{DataKey as ShipDataKey, ShipError, ShipNft};
 pub use blueprint_factory::{Blueprint, BlueprintError, BlueprintRarity};
 pub use referral_system::{Referral, ReferralError};
 pub use player_profile::{PlayerProfile, ProfileError, ProgressUpdate};
@@ -190,7 +192,16 @@ pub use batch_processor::{
     clear_batch, execute_batch, get_player_batch, queue_batch_operation, BatchError, BatchOp,
     BatchOpType, BatchResult, MAX_BATCH_SIZE,
 };
-pub use dex_integration::{cancel_listing, harvest_and_list};
+pub use dex_integration::{cancel_listing, harvest_and_list, list_at_market, DynamicListError};
+pub use dynamic_pricing::{
+    deviation_bps, dynamic_price, ema_step, get_price_state, get_pricing_config,
+    get_pricing_history, get_sma, get_volatility_bps, init_pricing_config, listing_price,
+    observe_price, observe_supply_demand, price_from_state, set_pricing_config, DynamicPrice,
+    PricePoint, PriceState, PricingConfig, PricingError, DEFAULT_BASE_VOLATILITY_BAND_BPS,
+    DEFAULT_MAX_DEVIATION_BPS, DEFAULT_MIN_COOLDOWN_SECS, DEFAULT_SMOOTHING_BPS,
+    DEFAULT_SUPPLY_DEMAND_ADJ_BPS, MAX_HISTORY_ENTRIES, MAX_SMOOTHING_BPS,
+    MAX_VOLATILITY_BAND_BPS,
+};
 pub use difficulty_scaler::{
     apply_scaling_to_layout, calculate_difficulty, DifficultyError, DifficultyResult,
     RarityWeights, MAX_LEVEL,
@@ -206,7 +217,11 @@ pub use metadata_resolver::{
 pub use randomness_oracle::{
     get_entropy_pool, request_random_seed, verify_and_fallback, OracleError,
 };
-pub use ship_upgrade::{ShipState, ShipUpgradeError, UpgradeBlueprint, apply_regen_upgrade};
+pub use ship_upgrade::{
+    ShipState, ShipUpgradeError, UpgradeBlueprint, UpgradeEconomy, apply_regen_upgrade,
+    get_total_upgrade_spend, get_upgrade_economy, quote_upgrade_cost, scaled_upgrade_cost,
+    set_upgrade_economy, DEFAULT_GROWTH_BPS, DEFAULT_MAX_COST,
+};
 pub use treasure_vault::{
     claim_treasure, deposit_treasure, get_vault, TreasureVault, VaultError,
     DEFAULT_MIN_LOCK_DURATION,
@@ -387,8 +402,13 @@ pub use trading::{
     MAX_SLIPPAGE_BPS, AMM_MAX_ROUTE_HOPS, SWAP_FEE_BPS,
 };
 
-pub use crafting::{craft, add_xp, get_level, get_xp};
+pub use crafting::{craft, craft_with_overcharge, add_xp, get_level, get_total_craft_sink, get_xp};
 pub use recipes::{RecipeError, set_recipe, unlock_rare_recipe};
+pub use ship_repair::{
+    RepairConfig, RepairQuote, RepairReceipt, ShipRepairError, get_repair_config,
+    get_total_repair_burn, quote_repair, repair_cost, set_repair_config,
+    DEFAULT_COST_PER_POINT, DEFAULT_EMERGENCY_SURCHARGE_BPS, DEFAULT_MAX_REPAIR_PER_CALL,
+};
 pub use nomad_bonding::{
     BondError, BondStatus, NomadBond, YieldDelegation,
     create_bond, accept_bond, delegate_yield, claim_yield, dissolve_bond,
@@ -1469,6 +1489,176 @@ impl NebulaNomadContract {
         bonus: u32,
     ) -> Result<(), ShipUpgradeError> {
         ship_upgrade::apply_regen_upgrade(&env, ship_id, bonus)
+    }
+
+    // ─── Upgrade cost curve (Issue #454) ─────────────────────────────────
+
+    /// Quote what installing `component` on `ship_id` costs right now, under
+    /// the active exponential cost curve. Pure view — does not charge the
+    /// player.
+    pub fn quote_upgrade_cost(
+        env: Env,
+        ship_id: u64,
+        component: Symbol,
+    ) -> Result<u32, ShipUpgradeError> {
+        ship_upgrade::quote_upgrade_cost(&env, ship_id, component)
+    }
+
+    /// Read the active upgrade cost curve. Returns the rebalanced default when
+    /// the admin has never overridden it.
+    pub fn get_upgrade_economy(env: Env) -> UpgradeEconomy {
+        ship_upgrade::get_upgrade_economy(&env)
+    }
+
+    /// Override the upgrade cost curve. Upgrade-admin only. `growth_bps = 0`
+    /// restores the legacy flat schedule.
+    pub fn set_upgrade_economy(
+        env: Env,
+        admin: Address,
+        economy: UpgradeEconomy,
+    ) -> Result<(), ShipUpgradeError> {
+        ship_upgrade::set_upgrade_economy(&env, &admin, economy)
+    }
+
+    /// Total resource units burned by upgrades across all ships.
+    pub fn get_total_upgrade_spend(env: Env) -> u32 {
+        ship_upgrade::get_total_upgrade_spend(&env)
+    }
+
+    // ─── Paid ship repair — resource sink (Issue #453) ───────────────────
+
+    /// Price a repair without mutating state. `emergency = true` prices the
+    /// field-patch special action, which repairs more per call at a surcharge.
+    pub fn quote_repair(
+        env: Env,
+        owner: Address,
+        ship_id: u64,
+        asset_id: Symbol,
+        emergency: bool,
+    ) -> Result<RepairQuote, ShipRepairError> {
+        ship_repair::quote_repair(&env, &owner, ship_id, asset_id, emergency)
+    }
+
+    /// Repair a ship, permanently burning resources in proportion to the
+    /// durability restored. `emergency = true` performs the surcharged
+    /// field-patch special action.
+    pub fn repair_ship(
+        env: Env,
+        player: Address,
+        ship_id: u64,
+        asset_id: Symbol,
+        emergency: bool,
+    ) -> Result<RepairReceipt, ShipRepairError> {
+        ship_repair::repair_ship(&env, &player, ship_id, asset_id, emergency)
+    }
+
+    /// Cumulative resource units destroyed by repairs across all ships.
+    pub fn get_total_repair_burn(env: Env) -> u32 {
+        ship_repair::get_total_repair_burn(&env)
+    }
+
+    /// Read the active repair pricing. Falls back to the balanced default.
+    pub fn get_repair_config(env: Env) -> RepairConfig {
+        ship_repair::get_repair_config(&env)
+    }
+
+    /// Seed the repair sink admin so pricing can be retuned later. Once only,
+    /// and optional — the sink runs on defaults without it.
+    pub fn init_repair_config(
+        env: Env,
+        admin: Address,
+        config: RepairConfig,
+    ) -> Result<(), ShipRepairError> {
+        ship_repair::init_repair_config(&env, &admin, config)
+    }
+
+    /// Retune repair pricing. Admin-only.
+    pub fn set_repair_config(
+        env: Env,
+        admin: Address,
+        config: RepairConfig,
+    ) -> Result<(), ShipRepairError> {
+        ship_repair::set_repair_config(&env, &admin, config)
+    }
+
+    // ─── Dynamic Resource Pricing (#452) ──────────────────────────────────
+
+    /// Seed the dynamic pricing admin and guards. Admin-only, once.
+    pub fn init_pricing_config(
+        env: Env,
+        admin: Address,
+        config: PricingConfig,
+    ) -> Result<(), PricingError> {
+        dynamic_pricing::init_pricing_config(&env, &admin, config)
+    }
+
+    /// Retune the dynamic pricing guards. Admin-only.
+    pub fn set_pricing_config(
+        env: Env,
+        admin: Address,
+        config: PricingConfig,
+    ) -> Result<(), PricingError> {
+        dynamic_pricing::set_pricing_config(&env, &admin, config)
+    }
+
+    /// The active dynamic pricing configuration.
+    pub fn get_pricing_config(env: Env) -> PricingConfig {
+        dynamic_pricing::get_pricing_config(&env)
+    }
+
+    /// Feed one raw price print into the EMA engine. Admin-only.
+    ///
+    /// Returns [`PricingError::DeviationTooLarge`] when the print sits outside
+    /// `max_deviation_bps` of the current average, in which case the average is
+    /// left untouched.
+    pub fn observe_price(
+        env: Env,
+        source: Address,
+        resource: Symbol,
+        raw_price: i128,
+    ) -> Result<PriceState, PricingError> {
+        dynamic_pricing::observe_price(&env, &source, resource, raw_price)
+    }
+
+    /// Record the supply/demand balance for a resource. Admin-only.
+    pub fn observe_supply_demand(
+        env: Env,
+        source: Address,
+        resource: Symbol,
+        supply: i128,
+        demand: i128,
+    ) -> Result<i128, PricingError> {
+        dynamic_pricing::observe_supply_demand(&env, &source, resource, supply, demand)
+    }
+
+    /// The EMA-smoothed, volatility-clamped price the economy should use.
+    pub fn get_dynamic_price(
+        env: Env,
+        resource: Symbol,
+    ) -> Result<DynamicPrice, PricingError> {
+        dynamic_pricing::dynamic_price(&env, resource)
+    }
+
+    /// Rolling state for a resource, including realized volatility.
+    pub fn get_price_state(env: Env, resource: Symbol) -> Result<PriceState, PricingError> {
+        dynamic_pricing::get_price_state(&env, resource)
+    }
+
+    /// Rolling price history for a resource, oldest first.
+    pub fn get_pricing_history(env: Env, resource: Symbol) -> Vec<PricePoint> {
+        dynamic_pricing::get_pricing_history(&env, resource)
+    }
+
+    /// Harvest a resource and list it at the current dynamic market price,
+    /// instead of a caller-supplied price (#452).
+    pub fn list_at_market(
+        env: Env,
+        player: Address,
+        ship_id: u64,
+        layout: NebulaLayout,
+        resource: Symbol,
+    ) -> Result<(crate::resource_minter::HarvestResult, crate::resource_minter::DexOffer, i128), DynamicListError> {
+        dex_integration::list_at_market(&env, &player, ship_id, &layout, &resource)
     }
 
     // ─── Cross-Player Resource Gifting (#27) ──────────────────────────────

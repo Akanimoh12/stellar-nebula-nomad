@@ -60,6 +60,9 @@ pub enum CraftingDataKey {
     /// Number of times (player, recipe_id) has been successfully crafted —
     /// drives the mastery output bonus.
     MasteryCount(Address, u32),
+    /// Cumulative resource units destroyed by crafting across all players
+    /// (Issue #453). The headline number for the resource-sinks dashboard.
+    TotalCraftedSink,
 }
 
 // ── Skill Tree (Issue #266) ─────────────────────────────────────────────────
@@ -89,56 +92,102 @@ const BASE_DISCOVERY_PCT: u64 = 5;
 /// Boosted discovery chance (with a "keen eye" node unlocked) out of 100.
 const BOOSTED_DISCOVERY_PCT: u64 = 10;
 
+/// Surcharge, in basis points, added to a recipe's primary input when the
+/// player buys a guaranteed rare-recipe discovery roll (Issue #453).
+///
+/// `10_000` = +100%, i.e. the player pays double the primary ingredient to
+/// skip the 5% roll. This is the "special action" sink: it converts a rare
+/// timesaving convenience directly into permanently destroyed resources.
+pub const OVERCHARGE_SURCHARGE_BPS: u32 = 10_000;
+
 use crate::ensure_auth;
 
+/// Craft a recipe at face value. Inputs are consumed (a resource sink) and the
+/// output is minted.
 pub fn craft(env: Env, player: Address, recipe_id: u32) -> Result<(), CraftingError> {
     ensure_auth!(player);
-    let recipe = get_recipe(&env, recipe_id).map_err(|_| CraftingError::RecipeNotFound)?;
+    craft_inner(&env, &player, recipe_id, false)
+}
 
-    if is_rare(&recipe) && !is_unlocked(&env, &player, recipe_id) {
+/// Craft a recipe while paying a surcharge on the primary input for a
+/// **guaranteed** rare-recipe discovery roll (Issue #453).
+///
+/// Costs `1 + OVERCHARGE_SURCHARGE_BPS/10_000` times the primary ingredient
+/// versus [`craft`], and burns that surplus permanently instead of returning
+/// it. Everything else — level, specialization, rarity gating, mastery — is
+/// identical to a normal craft.
+pub fn craft_with_overcharge(
+    env: Env,
+    player: Address,
+    recipe_id: u32,
+) -> Result<(), CraftingError> {
+    ensure_auth!(player);
+    craft_inner(&env, &player, recipe_id, true)
+}
+
+fn craft_inner(
+    env: &Env,
+    player: &Address,
+    recipe_id: u32,
+    overcharge: bool,
+) -> Result<(), CraftingError> {
+    let recipe = get_recipe(env, recipe_id).map_err(|_| CraftingError::RecipeNotFound)?;
+
+    if is_rare(&recipe) && !is_unlocked(env, player, recipe_id) {
         return Err(CraftingError::RecipeLocked);
     }
 
     // Specialization gate: recipes tagged via set_recipe_specialization
     // require the player to have chosen the matching tree (Issue #266).
-    if let Some(required_spec) = get_recipe_specialization(&env, recipe_id) {
-        if get_specialization(&env, &player) != Some(required_spec) {
+    if let Some(required_spec) = get_recipe_specialization(env, recipe_id) {
+        if get_specialization(env, player) != Some(required_spec) {
             return Err(CraftingError::WrongSpecialization);
         }
     }
 
-    let level = get_level(&env, player.clone());
+    let level = get_level(env, player.clone());
     if level < recipe.required_level {
         return Err(CraftingError::InsufficientLevel);
     }
 
-    require_resources(&env, &player, &recipe.inputs)?;
-    consume_resources(&env, &player, &recipe.inputs);
+    require_resources(env, player, &recipe.inputs)?;
+
+    // Burn the overcharge surplus *before* the craft so a player who cannot
+    // afford the premium never gets the guaranteed roll.
+    let mut surcharge = 0u32;
+    if overcharge {
+        surcharge = burn_overcharge_surcharge(env, player, &recipe)?;
+    }
+
+    let consumed = consume_resources(env, player, &recipe.inputs);
+    record_sink_volume(env, consumed.saturating_add(surcharge));
 
     // Mastery bonus: every MASTERY_INTERVAL crafts of the same recipe grants
     // +1 extra output (Issue #266).
-    let mastery_count = record_craft(&env, &player, recipe_id);
+    let mastery_count = record_craft(env, player, recipe_id);
     let bonus_output = mastery_count / MASTERY_INTERVAL;
     let (output_symbol, base_amount) = recipe.output.clone();
     mint_resource(
-        &env,
-        &player,
+        env,
+        player,
         (output_symbol, base_amount.saturating_add(bonus_output)),
     );
 
     let xp_gain = 10 + (recipe.rarity * 5);
-    add_xp(&env, player.clone(), xp_gain);
+    add_xp(env, player.clone(), xp_gain);
 
     // Recipe discovery: base 5% chance, boosted to 10% with a "keen eye"
-    // skill node unlocked (Issue #266).
-    let discovery_pct = if has_discovery_boost(&env, &player) {
+    // skill node unlocked (Issue #266). An overcharged craft skips the roll.
+    let discovery_pct = if overcharge {
+        100
+    } else if has_discovery_boost(env, player) {
         BOOSTED_DISCOVERY_PCT
     } else {
         BASE_DISCOVERY_PCT
     };
     let random: u64 = env.prng().gen();
     if random % 100 < discovery_pct {
-        unlock_rare_recipe(&env, player.clone(), 999);
+        unlock_rare_recipe(env, player.clone(), 999);
         env.events().publish(
             (symbol_short!("rare_dis"), player.clone()),
             symbol_short!("unlocked"),
@@ -146,6 +195,69 @@ pub fn craft(env: Env, player: Address, recipe_id: u32) -> Result<(), CraftingEr
     }
 
     Ok(())
+}
+
+/// Burn the overcharge surplus on the recipe's primary input.
+///
+/// Returns the number of resource units destroyed. Surplus is charged on top
+/// of the recipe's own cost, so the recipe inputs themselves stay intact for
+/// the craft that follows.
+fn burn_overcharge_surcharge(
+    env: &Env,
+    player: &Address,
+    recipe: &crate::recipes::Recipe,
+) -> Result<u32, CraftingError> {
+    let Some((symbol, base_amount)) = recipe.inputs.first() else {
+        // Nothing to surcharge a recipe that has no inputs.
+        return Ok(0);
+    };
+    let extra = base_amount
+        .saturating_mul(OVERCHARGE_SURCHARGE_BPS)
+        .checked_div(crate::ship_upgrade::BPS_DENOMINATOR)
+        .unwrap_or(0);
+    if extra == 0 {
+        return Ok(0);
+    }
+    let balance = get_resource_balance(env, player, symbol.clone());
+    if balance < base_amount.saturating_add(extra) {
+        return Err(CraftingError::InsufficientResources);
+    }
+    set_resource_balance(
+        env,
+        player,
+        symbol.clone(),
+        balance.saturating_sub(extra),
+    );
+    env.events()
+        .publish((symbol_short!("overchrg"), player.clone()), extra);
+    Ok(extra)
+}
+
+/// Add `amount` to the cumulative crafting sink and return the new total.
+fn record_sink_volume(env: &Env, amount: u32) -> u32 {
+    let total: u32 = env
+        .storage()
+        .persistent()
+        .get(&CraftingDataKey::TotalCraftedSink)
+        .unwrap_or(0);
+    let next = total.saturating_add(amount);
+    env.storage()
+        .persistent()
+        .set(&CraftingDataKey::TotalCraftedSink, &next);
+    next
+}
+
+/// Cumulative resource units destroyed by crafting across all players
+/// (Issue #453).
+///
+/// Every unit counted here left circulation permanently. Pairs with
+/// [`crate::ship_upgrade::get_total_upgrade_spend`] and
+/// [`crate::ship_repair::get_total_repair_burn`] to give the total sink rate.
+pub fn get_total_craft_sink(env: &Env) -> u32 {
+    env.storage()
+        .persistent()
+        .get(&CraftingDataKey::TotalCraftedSink)
+        .unwrap_or(0)
 }
 
 pub fn add_xp(env: &Env, player: Address, xp: u32) {
@@ -312,12 +424,17 @@ fn require_resources(
     Ok(())
 }
 
-fn consume_resources(env: &Env, player: &Address, inputs: &Vec<(Symbol, u32)>) {
+/// Deduct every recipe input from the player's balance, returning the total
+/// number of resource units destroyed.
+fn consume_resources(env: &Env, player: &Address, inputs: &Vec<(Symbol, u32)>) -> u32 {
+    let mut consumed = 0u32;
     for input in inputs.iter() {
         let (symbol, amount) = input;
         let balance = get_resource_balance(env, player, symbol.clone());
         set_resource_balance(env, player, symbol, balance - amount);
+        consumed = consumed.saturating_add(amount);
     }
+    consumed
 }
 
 fn mint_resource(env: &Env, player: &Address, output: (Symbol, u32)) {
@@ -611,6 +728,124 @@ mod tests {
             let out_bal: u32 = env.storage().instance().get(&key).unwrap_or(0);
             // 9 crafts at base output 1, plus the 10th craft's +1 mastery bonus.
             assert_eq!(out_bal, MASTERY_INTERVAL + 1);
+        });
+    }
+
+    // --- Issue #453: crafting sink effectiveness -----------------------------
+
+    /// Seed a contract, a 5-iron -> 1-steel recipe, and `iron_amount` iron.
+    fn setup_sink_scenario(iron_amount: u32) -> (Env, Address, Address, Symbol, Symbol) {
+        let (env, id) = make_env();
+        let player = Address::generate(&env);
+        let iron = Symbol::new(&env, "iron");
+        let steel = Symbol::new(&env, "steel");
+        env.mock_all_auths();
+        env.as_contract(&id, || {
+            let recipe = make_recipe(&env, 1, 1, iron.clone(), steel.clone());
+            recipes::set_recipe(&env, &recipe);
+            seed_resource(&env, &player, iron.clone(), iron_amount);
+        });
+        (env, id, player, iron, steel)
+    }
+
+    #[test]
+    fn total_craft_sink_starts_at_zero() {
+        let (env, id) = make_env();
+        env.as_contract(&id, || {
+            assert_eq!(get_total_craft_sink(&env), 0);
+        });
+    }
+
+    #[test]
+    fn craft_consumes_inputs_and_records_sink_volume() {
+        let (env, id, player, _iron, _steel) = setup_sink_scenario(10);
+        env.as_contract(&id, || {
+            craft(env.clone(), player.clone(), 1).unwrap();
+            // 5 iron destroyed, 1 steel minted.
+            assert_eq!(get_resource_balance(&env, &player, Symbol::new(&env, "iron")), 5);
+            assert_eq!(get_resource_balance(&env, &player, Symbol::new(&env, "steel")), 1);
+            assert_eq!(get_total_craft_sink(&env), 5);
+        });
+    }
+
+    #[test]
+    fn craft_sink_volume_accumulates_across_crafts() {
+        let (env, id, player, _iron, _steel) = setup_sink_scenario(20);
+        // One auth per frame, so one craft per contract scope.
+        for expected in [5u32, 10, 15, 20] {
+            env.as_contract(&id, || {
+                craft(env.clone(), player.clone(), 1).unwrap();
+                assert_eq!(get_total_craft_sink(&env), expected);
+            });
+        }
+        env.as_contract(&id, || {
+            assert_eq!(get_resource_balance(&env, &player, Symbol::new(&env, "iron")), 0);
+        });
+    }
+
+    #[test]
+    fn overcharge_burns_extra_primary_input() {
+        // 5 for the recipe + 5 surcharge at +100%.
+        let (env, id, player, _iron, _steel) = setup_sink_scenario(10);
+        env.as_contract(&id, || {
+            craft_with_overcharge(env.clone(), player.clone(), 1).unwrap();
+            assert_eq!(get_resource_balance(&env, &player, Symbol::new(&env, "iron")), 0);
+            assert_eq!(get_resource_balance(&env, &player, Symbol::new(&env, "steel")), 1);
+            // Both the recipe inputs and the surcharge are permanent sinks.
+            assert_eq!(get_total_craft_sink(&env), 10);
+        });
+    }
+
+    #[test]
+    fn overcharge_rejected_when_cannot_afford_surcharge() {
+        // Exactly enough for the recipe, but not for the premium.
+        let (env, id, player, _iron, _steel) = setup_sink_scenario(5);
+        env.as_contract(&id, || {
+            assert_eq!(
+                craft_with_overcharge(env.clone(), player.clone(), 1),
+                Err(CraftingError::InsufficientResources)
+            );
+            // Rejected before any mutation: the balance is untouched and the
+            // player never receives the guaranteed discovery roll.
+            assert_eq!(get_resource_balance(&env, &player, Symbol::new(&env, "iron")), 5);
+            assert_eq!(get_total_craft_sink(&env), 0);
+            assert!(!is_unlocked(&env, &player, 999));
+        });
+    }
+
+    #[test]
+    fn overcharge_guarantees_rare_discovery() {
+        let (env, id, player, _iron, _steel) = setup_sink_scenario(10);
+        env.as_contract(&id, || {
+            assert!(!is_unlocked(&env, &player, 999));
+            craft_with_overcharge(env.clone(), player.clone(), 1).unwrap();
+            // 100% discovery chance: the roll is skipped, never failed.
+            assert!(is_unlocked(&env, &player, 999));
+        });
+    }
+
+    #[test]
+    fn unknown_recipe_does_not_sink_resources() {
+        let (env, id, player, _iron, _steel) = setup_sink_scenario(10);
+        env.as_contract(&id, || {
+            assert_eq!(
+                craft(env.clone(), player.clone(), 404),
+                Err(CraftingError::RecipeNotFound)
+            );
+            assert_eq!(get_total_craft_sink(&env), 0);
+            assert_eq!(get_resource_balance(&env, &player, Symbol::new(&env, "iron")), 10);
+        });
+    }
+
+    #[test]
+    fn insufficient_resources_does_not_sink() {
+        let (env, id, player, _iron, _steel) = setup_sink_scenario(4);
+        env.as_contract(&id, || {
+            assert_eq!(
+                craft(env.clone(), player.clone(), 1),
+                Err(CraftingError::InsufficientResources)
+            );
+            assert_eq!(get_total_craft_sink(&env), 0);
         });
     }
 }
