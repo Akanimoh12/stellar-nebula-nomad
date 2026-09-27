@@ -12,6 +12,7 @@ use crate::nebula_explorer::{CellType, NebulaLayout};
 use crate::nebula_gen::{NebulaError as NebulaGenError, NebulaGen};
 use crate::rate_limiter::{check_rate_limit, Operation, RateLimitError};
 use crate::economics::anti_whale::{process_anti_whale_action, AntiWhaleError};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec};
 
 pub type AssetId = ResourceType;
 
@@ -99,7 +100,7 @@ impl crate::error_standard::StandardContractError for MinterError {
             Self::InvalidAmount => (ErrorKind::Validation, false),
             Self::RateLimitExceeded => (ErrorKind::ResourceLimit, true),
             Self::NoLayoutForShip | Self::NoResourceAtAnomaly => (ErrorKind::NotFound, false),
-            Self::ArithmeticOverflow | Self::InsufficientBalance => {
+            Self::ArithmeticOverflow | Self::InsufficientBalance | Self::DailyCapExceeded => {
                 (ErrorKind::ResourceLimit, false)
             }
         };
@@ -555,7 +556,7 @@ pub fn harvest_resources(
     ship_id: u64,
     layout: &NebulaLayout,
 ) -> Result<HarvestResult, HarvestError> {
-    let ship = ship_nft::get_ship(env, ship_id).map_err(|_| HarvestError::ShipNotFound)?;
+    let ship = crate::ship_nft::get_ship(env, ship_id).map_err(|_| HarvestError::ShipNotFound)?;
 
     let mut resources: Vec<HarvestedResource> = Vec::new(env);
     let mut total_harvested: u32 = 0;
