@@ -254,6 +254,11 @@ path = "tests/misc/test_new_features_combined.rs"
 name = "test_new_modules"
 path = "tests/misc/test_new_modules.rs"
 
+# symbol_short! 9-char limit guard (Issues #392, #393)
+[[test]]
+name = "test_symbol_lengths"
+path = "tests/misc/test_symbol_lengths.rs"
+
 # End-to-end integration test suite (Issue #427)
 [[test]]
 name = "test_e2e_flows"

@@ -1,0 +1,29 @@
+name: Fuzz
+
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Seconds to fuzz each target"
+        default: "300"
+  schedule:
+    - cron: "0 3 * * 0"
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [fuzz_nebula_layout, fuzz_ship_mint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz --locked
+      - name: Run ${{ matrix.target }}
+        run: cargo fuzz run ${{ matrix.target }} -- -max_total_time=${{ github.event.inputs.seconds || '300' }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts

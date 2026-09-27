@@ -47,4 +47,6 @@ test_snapshots/fuzz_*
 issue.md
 pr.md
 coverage/
-mutants.out/
+mutants.out//fuzz/target
+/fuzz/corpus
+/fuzz/artifacts
