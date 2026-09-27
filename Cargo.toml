@@ -79,6 +79,10 @@ path = "tests/fuzz/fuzz_trading.rs"
 name = "fuzz_yield"
 path = "tests/fuzz/fuzz_yield.rs"
 
+[[test]]
+name = "fuzz_comprehensive"
+path = "tests/fuzz/fuzz_comprehensive.rs"
+
 # Economy & DeFi mechanics: staking, yield, DEX, sponsorship, batching
 [[test]]
 name = "test_batch_processor"
