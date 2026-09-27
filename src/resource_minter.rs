@@ -52,6 +52,39 @@ pub struct ResourceRecord {
     pub minted_at: u64,
 }
 
+/// Compact form of [`ResourceRecord`]: `amount` and `minted_at` share one
+/// `u128` slot (see `storage_optim::pack_u64x2`). New storage only; existing
+/// `ResourceRecord` entries are untouched for backward compatibility.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PackedResourceRecord {
+    pub owner: Address,
+    pub resource_type: ResourceType,
+    pub packed: u128,
+}
+
+impl From<&ResourceRecord> for PackedResourceRecord {
+    fn from(r: &ResourceRecord) -> Self {
+        Self {
+            owner: r.owner.clone(),
+            resource_type: r.resource_type.clone(),
+            packed: crate::storage_optim::pack_u64x2(r.amount, r.minted_at),
+        }
+    }
+}
+
+impl From<&PackedResourceRecord> for ResourceRecord {
+    fn from(p: &PackedResourceRecord) -> Self {
+        let (amount, minted_at) = crate::storage_optim::unpack_u64x2(p.packed);
+        Self {
+            owner: p.owner.clone(),
+            resource_type: p.resource_type.clone(),
+            amount,
+            minted_at,
+        }
+    }
+}
+
 #[contracttype]
 pub enum MinterKey {
     Balance(Address, ResourceType),
@@ -1349,5 +1382,25 @@ mod tests {
                 assert_eq!(resource_balance(env, &owner, &asset), u32::MAX);
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod packed_record_tests {
+    use super::*;
+    use soroban_sdk::testutils::Address as _;
+
+    #[test]
+    fn packed_resource_record_round_trips() {
+        let env = Env::default();
+        let rec = ResourceRecord {
+            owner: Address::generate(&env),
+            resource_type: ResourceType::DarkMatter,
+            amount: u64::MAX,
+            minted_at: 1_700_000_000,
+        };
+        let packed = PackedResourceRecord::from(&rec);
+        assert_eq!(packed.packed, (1_700_000_000u128 << 64) | u64::MAX as u128);
+        assert_eq!(ResourceRecord::from(&packed), rec);
     }
 }

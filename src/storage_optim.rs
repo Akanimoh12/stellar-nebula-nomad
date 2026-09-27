@@ -591,6 +591,93 @@ pub fn get_ship_nebula_batch(
     Ok(out)
 }
 
+// ─── Value packing & bloom filter (Issue #482) ────────────────────────────
+//
+// Packing several small values into one `u128` turns N storage entries into
+// one. The layouts below are part of the storage format: changing them breaks
+// previously written data, so they are pinned by regression tests.
+
+/// Pack three `u32` values into one `u128` (`a` in the low 32 bits).
+pub fn pack_u32x3(a: u32, b: u32, c: u32) -> u128 {
+    u128::from(a) | (u128::from(b) << 32) | (u128::from(c) << 64)
+}
+
+/// Inverse of [`pack_u32x3`].
+#[allow(clippy::cast_possible_truncation)] // truncation is the unpacking
+pub fn unpack_u32x3(packed: u128) -> (u32, u32, u32) {
+    (packed as u32, (packed >> 32) as u32, (packed >> 64) as u32)
+}
+
+/// Pack two `u64` values into one `u128` (`lo` in the low 64 bits).
+pub fn pack_u64x2(lo: u64, hi: u64) -> u128 {
+    u128::from(lo) | (u128::from(hi) << 64)
+}
+
+/// Inverse of [`pack_u64x2`].
+#[allow(clippy::cast_possible_truncation)] // truncation is the unpacking
+pub fn unpack_u64x2(packed: u128) -> (u64, u64) {
+    (packed as u64, (packed >> 64) as u64)
+}
+
+/// Three independent 7-bit bit positions derived from a 32-byte key.
+fn bloom_positions(key: &BytesN<32>) -> [u32; 3] {
+    let b = key.to_array();
+    [
+        u32::from(b[0] & 0x7F),
+        u32::from(b[11] & 0x7F),
+        u32::from(b[23] & 0x7F),
+    ]
+}
+
+/// Add `key` to a 128-bit bloom filter and return the new filter.
+pub fn bloom_insert(filter: u128, key: &BytesN<32>) -> u128 {
+    bloom_positions(key)
+        .iter()
+        .fold(filter, |f, p| f | (1u128 << p))
+}
+
+/// `false` means `key` is definitely absent, so the expensive storage lookup
+/// can be skipped. `true` means "maybe present".
+pub fn bloom_may_contain(filter: u128, key: &BytesN<32>) -> bool {
+    bloom_positions(key)
+        .iter()
+        .all(|p| filter & (1u128 << p) != 0)
+}
+
+#[cfg(test)]
+mod packing_tests {
+    use super::*;
+
+    #[test]
+    fn u32x3_round_trip_and_layout_is_stable() {
+        assert_eq!(unpack_u32x3(pack_u32x3(1, u32::MAX, 7)), (1, u32::MAX, 7));
+        // Regression guard: storage layout must not change.
+        assert_eq!(pack_u32x3(1, 2, 3), 0x0000_0003_0000_0002_0000_0001);
+    }
+
+    #[test]
+    fn u64x2_round_trip_and_layout_is_stable() {
+        assert_eq!(unpack_u64x2(pack_u64x2(u64::MAX, 9)), (u64::MAX, 9));
+        assert_eq!(pack_u64x2(1, 2), (2u128 << 64) | 1);
+    }
+
+    #[test]
+    fn bloom_filter_has_no_false_negatives() {
+        let env = Env::default();
+        let a = BytesN::from_array(&env, &[1u8; 32]);
+        let mut raw = [0u8; 32];
+        raw[0] = 5;
+        raw[11] = 6;
+        raw[23] = 7;
+        let b = BytesN::from_array(&env, &raw);
+        let f = bloom_insert(0, &a);
+        assert!(bloom_may_contain(f, &a));
+        assert!(!bloom_may_contain(f, &b));
+        let f = bloom_insert(f, &b);
+        assert!(bloom_may_contain(f, &a) && bloom_may_contain(f, &b));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

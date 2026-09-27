@@ -5,6 +5,16 @@ use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Vec};
 pub const GRID_SIZE: u32 = 16;
 pub const TOTAL_CELLS: u32 = GRID_SIZE * GRID_SIZE;
 
+/// Validate `scan_nebula` inputs: the region id must be in range and the seed
+/// must not be a degenerate (all-identical-byte) pattern.
+pub fn validate_scan_inputs(
+    seed: &BytesN<32>,
+    region_id: u32,
+) -> Result<(), crate::input_validation::ValidationError> {
+    crate::input_validation::validate_region_id(region_id)?;
+    crate::input_validation::validate_seed(seed)
+}
+
 #[derive(Clone, Debug, PartialEq)]
 #[contracttype]
 pub enum CellType {
@@ -224,4 +234,32 @@ pub fn emit_nebula_scanned(env: &Env, player: &Address, layout_hash: &BytesN<32>
         (symbol_short!("nebula"), symbol_short!("scanned")),
         (player.clone(), layout_hash.clone(), rarity.clone()),
     );
+}
+
+#[cfg(test)]
+mod scan_input_tests {
+    use super::*;
+    use crate::input_validation::{ValidationError, MAX_REGION_ID};
+
+    #[test]
+    fn scan_inputs_validated() {
+        let env = Env::default();
+        let mut raw = [0u8; 32];
+        raw[0] = 1;
+        let seed = BytesN::from_array(&env, &raw);
+        let zero = BytesN::from_array(&env, &[0u8; 32]);
+        assert_eq!(validate_scan_inputs(&seed, 1), Ok(()));
+        assert_eq!(
+            validate_scan_inputs(&seed, 0),
+            Err(ValidationError::InvalidRegionId)
+        );
+        assert_eq!(
+            validate_scan_inputs(&seed, MAX_REGION_ID + 1),
+            Err(ValidationError::InvalidRegionId)
+        );
+        assert_eq!(
+            validate_scan_inputs(&zero, 1),
+            Err(ValidationError::InvalidSeed)
+        );
+    }
 }

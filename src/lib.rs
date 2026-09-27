@@ -10,7 +10,10 @@ use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, String, S
 // `nebula_explorer` is a private module, so re-export the whole scan surface to
 // give downstream callers (and integration tests) a nameable path.
 pub use crate::nebula_explorer::{
-    CellType, NebulaCell, NebulaLayout, Rarity, GRID_SIZE, TOTAL_CELLS,
+    validate_scan_inputs, CellType, NebulaCell, NebulaLayout, Rarity, GRID_SIZE, TOTAL_CELLS,
+};
+pub use crate::input_validation::{
+    checked_region_offset, validate_region_id, validate_seed, ValidationError, MAX_REGION_ID,
 };
 
 mod access_control;
@@ -295,7 +298,8 @@ pub use storage_optim::{
     update_bump_config, get_bump_config, set_upgrade_target, get_upgrade_target,
     reset_burst_counter, get_optimized_entries, get_ship_nebula_batch, StorageError,
     OptimizedEntry, ShipNebulaData, OptimResult, BumpConfig, CachedEntry, StorageTier,
-    DEFAULT_BUMP_TTL, MAX_BUMP_TTL, MAX_BURST_READS,
+    DEFAULT_BUMP_TTL, MAX_BUMP_TTL, MAX_BURST_READS, pack_u32x3, unpack_u32x3, pack_u64x2,
+    unpack_u64x2, bloom_insert, bloom_may_contain,
 };
 pub use state_snapshot::{
     take_snapshot, restore_from_snapshot, get_snapshot, get_ship_snapshots,

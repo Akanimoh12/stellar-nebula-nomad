@@ -1,0 +1,52 @@
+name: Load Tests
+
+on:
+  pull_request:
+    paths:
+      - "src/nebula_explorer.rs"
+      - "src/nebula_gen.rs"
+      - "src/resource_minter.rs"
+      - "src/escrow_trader.rs"
+      - "src/leaderboards.rs"
+      - "src/storage_optim.rs"
+      - "tests/load/**"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "k6 profile (smoke|baseline|stress|spike|soak|breakpoint)"
+        default: "smoke"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    env:
+      PROFILE: ${{ github.event.inputs.profile || 'smoke' }}
+      RPC_URL: ${{ secrets.LOAD_TEST_RPC_URL || 'https://soroban-testnet.stellar.org' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Run load tests
+        working-directory: tests/load
+        run: |
+          set -o pipefail
+          for s in nebula_scan_load resource_mint_load trading_load leaderboard_load; do
+            echo "## $s" >> summary.md
+            echo '```' >> summary.md
+            k6 run -q "$s.js" | tee -a summary.md
+            echo '```' >> summary.md
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-reports
+          path: tests/load/load-*
+      - name: Comment results on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: k6-load-tests
+          path: tests/load/summary.md
