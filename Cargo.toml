@@ -279,13 +279,13 @@ path = "tests/property_tests/nebula_gen_tests.rs"
 fuzz = ["soroban-sdk/testutils"]
 
 [dependencies]
-soroban-sdk = "22.0"
+soroban-sdk = "28.0"
 # no_std-compatible math (pow/round/etc.) for ELO and other floating-point
 # calculations that plain core::f64 doesn't provide without std.
 libm = "0.2"
 
 [dev-dependencies]
-soroban-sdk = { version = "22.0", features = ["testutils"] }
+soroban-sdk = { version = "28.0", features = ["testutils"] }
 proptest = "=1.6.0"
 rand = "=0.8.5"
 
