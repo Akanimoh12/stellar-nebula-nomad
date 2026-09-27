@@ -1,0 +1,48 @@
+name: Mutation Testing
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Cargo.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutants:
+    name: Run cargo-mutants
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo-mutants binary
+        uses: actions/cache@v4
+        id: cache-cargo-mutants
+        with:
+          path: ~/.cargo/bin/cargo-mutants
+          key: ${{ runner.os }}-cargo-mutants-24.0.0
+
+      - name: Install cargo-mutants
+        if: steps.cache-cargo-mutants.outputs.cache-hit != 'true'
+        run: cargo install cargo-mutants --locked
+
+      - name: Run mutation testing on changed priority modules
+        run: |
+          cargo mutants --file src/access_control.rs --file src/resource_minter.rs --file src/nebula_gen.rs --file src/ship_registry.rs --file src/nomad_bonding.rs --output mutants.out
+
+      - name: Upload mutation testing results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants-report
+          path: mutants.out/

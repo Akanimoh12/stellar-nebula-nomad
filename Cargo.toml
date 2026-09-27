@@ -273,6 +273,40 @@ path = "tests/integration/test_e2e_flows.rs"
 name = "test_nebula_gen_properties"
 path = "tests/property_tests/nebula_gen_tests.rs"
 
+# Property-based tests for core modules (Issue #477)
+[[test]]
+name = "nebula_gen_properties"
+path = "tests/property/nebula_gen_properties.rs"
+
+[[test]]
+name = "resource_minter_properties"
+path = "tests/property/resource_minter_properties.rs"
+
+[[test]]
+name = "economic_properties"
+path = "tests/property/economic_properties.rs"
+
+# End-to-end cross-contract integration test suites (Issue #479)
+[[test]]
+name = "player_journey_test"
+path = "tests/integration/player_journey_test.rs"
+
+[[test]]
+name = "guild_operations_test"
+path = "tests/integration/guild_operations_test.rs"
+
+[[test]]
+name = "economic_cycle_test"
+path = "tests/integration/economic_cycle_test.rs"
+
+[[test]]
+name = "governance_flow_test"
+path = "tests/integration/governance_flow_test.rs"
+
+[[test]]
+name = "emergency_scenarios_test"
+path = "tests/integration/emergency_scenarios_test.rs"
+
 [features]
 # Enable advanced fuzz / property-based testing helpers.
 # Usage: cargo test --features fuzz

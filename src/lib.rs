@@ -13,7 +13,7 @@ pub use crate::nebula_explorer::{
     CellType, NebulaCell, NebulaLayout, Rarity, GRID_SIZE, TOTAL_CELLS,
 };
 
-mod access_control;
+pub mod access_control;
 pub mod error_standard;
 mod analytics;
 mod player_segmentation;
@@ -40,7 +40,7 @@ mod difficulty_curve;
 mod health_monitor;
 mod achievement_engine;
 mod data_exporter;
-mod emergency_controls;
+pub mod emergency_controls;
 mod metadata_resolver;
 mod randomness_oracle;
 pub mod rate_limiter;
@@ -89,7 +89,7 @@ mod portal_registry;
 mod constellation_mapper;
 mod entanglement_comms;
 mod wormhole_traveler;
-mod alliance_manager;
+pub mod alliance_manager;
 mod market_oracle;
 mod audio_seed_generator;
 mod privacy_stats;
@@ -98,7 +98,7 @@ pub mod event_scheduler;
 
 mod rewards;
 mod nft_marketplace;
-mod trading;
+pub mod trading;
 pub mod seasons;
 mod battle_pass;
 
@@ -129,7 +129,7 @@ mod composability_examples;
 mod input_validation;
 mod quest_system;
 mod ai_mission_engine;
-mod guild_quests;
+pub mod guild_quests;
 mod reputation;
 
 pub use reentrancy_guard::ReentrancyError;
