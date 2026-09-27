@@ -13,6 +13,26 @@ pub enum FarmError {
     RewardNotReady = 7,
 }
 
+impl crate::error_standard::StandardContractError for FarmError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::LockNotMet | Self::RewardNotReady => (ErrorKind::Conflict, true),
+            Self::InsufficientBalance | Self::WhaleCapExceeded | Self::ArithmeticOverflow => {
+                (ErrorKind::ResourceLimit, false)
+            }
+            Self::InvalidPool => (ErrorKind::Validation, false),
+            Self::PoolNotActive => (ErrorKind::Conflict, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "yield_farming",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RewardSchedule {

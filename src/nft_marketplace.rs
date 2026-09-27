@@ -170,6 +170,33 @@ pub enum MarketplaceError {
     ArithmeticOverflow = 14,
 }
 
+impl crate::error_standard::StandardContractError for MarketplaceError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::AlreadyListed
+            | Self::NotListed
+            | Self::SkinNotTradeable
+            | Self::RoyaltyAlreadyRegistered => (ErrorKind::Conflict, false),
+            Self::NotSeller | Self::NotSkinOwner => (ErrorKind::Authorization, false),
+            Self::InvalidPrice
+            | Self::SelfPurchase
+            | Self::PriceBelowRarityFloor
+            | Self::RoyaltyTooHigh => (ErrorKind::Validation, false),
+            Self::SellerListingCapReached | Self::ArithmeticOverflow => {
+                (ErrorKind::ResourceLimit, false)
+            }
+            Self::SkinNotFound | Self::NothingToWithdraw => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "nft_marketplace",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 impl From<SkinError> for MarketplaceError {
     fn from(e: SkinError) -> Self {
         match e {

@@ -24,6 +24,8 @@ enum Action {
     FixInput,
     /// A prerequisite is missing: run it first, then retry.
     RunPrerequisite(&'static str),
+    /// A rate limit was hit: back off, then retry the same request.
+    BackOffAndRetry,
     /// Wrong signer or permission.
     NeedsAuthorization,
     /// Operator or setup problem.
@@ -40,6 +42,7 @@ fn classify_nebula(err: NebulaError) -> Action {
         | NebulaError::InvalidSize
         | NebulaError::InvalidTtl => Action::FixInput,
         NebulaError::LayoutNotFound => Action::RunPrerequisite("generate_validated_nebula_layout"),
+        NebulaError::RateLimitExceeded => Action::BackOffAndRetry,
         NebulaError::NotInitialized | NebulaError::AlreadyInitialized => Action::ReportToOperator,
     }
 }

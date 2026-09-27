@@ -38,6 +38,24 @@ pub enum EmergencyError {
     EmptyAdminSet = 6,
 }
 
+impl crate::error_standard::StandardContractError for EmergencyError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ContractPaused | Self::UnpauseDelayNotMet => (ErrorKind::Conflict, true),
+            Self::NotAdmin => (ErrorKind::Authorization, false),
+            Self::NotPaused | Self::AlreadyInitialized => (ErrorKind::Conflict, false),
+            Self::EmptyAdminSet => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "emergency_controls",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Internal Helpers ────────────────────────────────────────────────────
 
 fn is_admin(env: &Env, caller: &Address) -> bool {

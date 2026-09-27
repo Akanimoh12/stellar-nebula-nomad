@@ -8,6 +8,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_ROOT/backups}"
+mkdir -p "$BACKUP_DIR"
 LOG_FILE="${BACKUP_DIR}/restore.log"
 
 # Stellar configuration
@@ -56,6 +57,7 @@ OPTIONS:
     -n, --network NAME      Network (testnet/mainnet)
     -d, --dry-run          Perform dry run without actual restore
     -v, --verify-only      Only verify backup integrity
+        --test-mode        Verify + dry-run (used by backup.sh --test-restore)
     -h, --help             Show this help message
 
 EXAMPLES:
@@ -105,6 +107,11 @@ while [[ $# -gt 0 ]]; do
             VERIFY_ONLY=true
             shift
             ;;
+        --test-mode)
+            VERIFY_ONLY=true
+            DRY_RUN=true
+            shift
+            ;;
         -h|--help)
             usage
             ;;
@@ -130,12 +137,12 @@ fi
 check_prerequisites() {
     log "Checking prerequisites..."
     
-    if ! command -v stellar &> /dev/null; then
+    if [ "$VERIFY_ONLY" = false ] && [ "$DRY_RUN" = false ] && ! command -v stellar &> /dev/null; then
         log_error "Stellar CLI not found. Please install it first."
         exit 1
     fi
     
-    if [ "$VERIFY_ONLY" = false ] && [ -z "$CONTRACT_ID" ]; then
+    if [ "$VERIFY_ONLY" = false ] && [ "$DRY_RUN" = false ] && [ -z "$CONTRACT_ID" ]; then
         log_error "CONTRACT_ID not set and not in verify-only mode"
         exit 1
     fi
@@ -173,10 +180,10 @@ verify_backup_integrity() {
     # Verify checksums
     cd "$EXTRACT_DIR"
     if [ -f "verification/checksums.txt" ]; then
-        sha256sum -c verification/checksums.txt > /dev/null 2>&1 || {
+        if ! sha256sum -c verification/checksums.txt; then
             log_error "Checksum verification failed!"
             return 1
-        }
+        fi
         log_success "Checksum verification passed"
     else
         log_warning "No checksums file found, skipping verification"

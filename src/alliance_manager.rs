@@ -53,6 +53,25 @@ pub enum AllianceError {
     InsufficientVotes = 7,
 }
 
+impl crate::error_standard::StandardContractError for AllianceError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::AllianceFull | Self::InsufficientVotes => (ErrorKind::ResourceLimit, false),
+            Self::AllianceNotFound => (ErrorKind::NotFound, false),
+            Self::AlreadyInAlliance => (ErrorKind::Conflict, false),
+            Self::NotMember | Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::InvalidName => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "alliance_manager",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 #[contracttype]
 pub struct Alliance {

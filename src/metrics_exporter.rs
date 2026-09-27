@@ -53,6 +53,23 @@ pub enum MetricsError {
     InvalidMetric = 3,
 }
 
+impl crate::error_standard::StandardContractError for MetricsError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::NotInitialized => (ErrorKind::NotFound, false),
+            Self::InvalidMetric => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "metrics_exporter",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Data Structures ─────────────────────────────────────────────────────
 
 /// Transaction metrics snapshot.
@@ -179,19 +196,31 @@ pub fn record_tx_failure(env: &Env, error_type: Symbol) {
         .instance()
         .set(&MetricsKey::LastUpdateTime, &env.ledger().timestamp());
 
-    // Track error frequency.
-    let mut error_freq: u64 = env
+    // Track error frequency and persist it so Prometheus scrapes stay accurate.
+    let mut freq_map: Map<Symbol, u64> = env
         .storage()
         .persistent()
         .get(&MetricsKey::ErrorTypeFrequency)
-        .and_then(|m: Map<Symbol, u64>| m.get(error_type.clone()))
-        .unwrap_or(0);
+        .unwrap_or_else(|| Map::new(env));
+    let mut error_freq: u64 = freq_map.get(error_type.clone()).unwrap_or(0);
     error_freq += 1;
+    freq_map.set(error_type.clone(), error_freq);
+    env.storage()
+        .persistent()
+        .set(&MetricsKey::ErrorTypeFrequency, &freq_map);
 
     env.events().publish(
         (symbol_short!("metrics"), symbol_short!("tx_fail")),
         (failures, error_type, env.ledger().timestamp()),
     );
+}
+
+/// Return the persisted per-error-type frequency map.
+pub fn get_error_frequency(env: &Env) -> Map<Symbol, u64> {
+    env.storage()
+        .persistent()
+        .get(&MetricsKey::ErrorTypeFrequency)
+        .unwrap_or_else(|| Map::new(env))
 }
 
 /// Record an active user (typically called on auth).

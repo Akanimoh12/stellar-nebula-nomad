@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, contracterror, symbol_short, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{contracttype, contracterror, symbol_short, Address, Env, String, Vec};
 
 pub const MIN_REPUTATION: u32 = 1;
 pub const MAX_REPUTATION: u32 = 100;
@@ -30,6 +30,26 @@ pub enum ReputationError {
     InvalidBehavior = 6,
     AlreadyBanned = 7,
     NotInitialized = 8,
+}
+
+impl crate::error_standard::StandardContractError for ReputationError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::Unauthorized | Self::AlreadyBanned => (ErrorKind::Authorization, false),
+            Self::ReputationNotFound | Self::ReportNotFound | Self::NotInitialized => {
+                (ErrorKind::NotFound, false)
+            }
+            Self::InvalidScore | Self::InvalidBehavior => (ErrorKind::Validation, false),
+            Self::MaxReportsExceeded => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "reputation",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -437,7 +457,7 @@ pub fn claim_reputation_reward(env: &Env, player: &Address) -> Result<i128, Repu
     Ok(reward)
 }
 
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use soroban_sdk::testutils::Address as _;

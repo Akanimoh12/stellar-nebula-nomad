@@ -35,6 +35,24 @@ pub enum ConstellationError {
     BurstTooLarge = 4,
 }
 
+impl crate::error_standard::StandardContractError for ConstellationError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::NoMatchFound => (ErrorKind::NotFound, false),
+            Self::TooFewStars => (ErrorKind::Validation, false),
+            Self::ImmutableRecord => (ErrorKind::Conflict, false),
+            Self::BurstTooLarge => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "constellation_mapper",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Data Types ─────────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, PartialEq)]

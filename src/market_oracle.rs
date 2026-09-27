@@ -30,6 +30,27 @@ pub enum OracleError {
     InvalidTriggerPrice = 8,
 }
 
+impl crate::error_standard::StandardContractError for OracleError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::StalePrice => (ErrorKind::Conflict, false),
+            Self::InvalidPrice | Self::InvalidTriggerPrice => (ErrorKind::Validation, false),
+            Self::ResourceNotFound | Self::NoOracleSources | Self::EventTriggerNotFound => {
+                (ErrorKind::NotFound, false)
+            }
+            Self::TooManyUpdates => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "market_oracle",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 #[contracttype]
 pub struct PriceData {

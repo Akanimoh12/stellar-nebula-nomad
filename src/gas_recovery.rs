@@ -1,7 +1,6 @@
 use soroban_sdk::{
-    contracterror, contracttype, symbol_short, Address, BytesN, Env, Vec, Map,
+    contracterror, contracttype, symbol_short, Address, BytesN, Env, Vec
 };
-
 /// Default refund percentage in basis points (100 = 1%).
 pub const DEFAULT_REFUND_BPS: u32 = 500; // 5%
 
@@ -39,6 +38,24 @@ pub enum RefundError {
     BatchTooLarge = 4,
     /// Invalid refund percentage.
     InvalidPercentage = 5,
+}
+
+impl crate::error_standard::StandardContractError for RefundError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::NotEligibleForRefund | Self::NotAuthorized => (ErrorKind::Authorization, false),
+            Self::AlreadyRefunded => (ErrorKind::Conflict, false),
+            Self::BatchTooLarge => (ErrorKind::ResourceLimit, false),
+            Self::InvalidPercentage => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "gas_recovery",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 use crate::{ensure_auth, storage_get_default, storage_set};

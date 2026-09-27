@@ -62,6 +62,34 @@ fn test_cancel_listing_deactivates_offer() {
 }
 
 #[test]
+fn test_cancel_listing_by_non_seller_fails() {
+    let (env, client, player) = setup();
+    let (ship_id, layout) = mint_and_layout(&env, &client, &player);
+
+    let resource = symbol_short!("dust");
+    let (_, offer) = client.harvest_and_list(&player, &ship_id, &layout, &resource, &50i128);
+    assert!(
+        offer.amount > 0,
+        "escrow must be non-empty for this test to mean anything"
+    );
+
+    // An unrelated address must not be able to cancel the seller's live offer:
+    // the escrow refund is credited to the caller, so allowing this would hand
+    // the seller's escrowed units to anyone who noticed the offer.
+    let attacker = Address::generate(&env);
+    let result = client.try_cancel_listing(&attacker, &offer.offer_id);
+    assert!(
+        result.is_err(),
+        "non-seller must not be able to cancel the offer"
+    );
+
+    // The offer must survive the rejected attempt and still be cancellable by
+    // its actual seller.
+    let cancelled = client.cancel_listing(&player, &offer.offer_id);
+    assert!(!cancelled.active);
+}
+
+#[test]
 fn test_cancel_already_cancelled_fails() {
     let (env, client, player) = setup();
     let (ship_id, layout) = mint_and_layout(&env, &client, &player);
@@ -92,7 +120,12 @@ fn test_burst_limit_enforced() {
     let metadata = Bytes::from_slice(&env, &[0u8; 4]);
     let resource = symbol_short!("dust");
 
-    // Create 5 ships, each with its own layout
+    // Create 5 ships, each with its own layout.
+    //
+    // `generate_nebula_layout` is itself rate-limited to 5 calls / 60 s per
+    // address, which would trip at the same iteration count as the DEX cap this
+    // test targets. Step past the rate-limit window on each round so the only
+    // limit in play is `MAX_LISTINGS_PER_SESSION`.
     for i in 0..5u8 {
         let ship = client.mint_ship(&player, &symbol_short!("explorer"), &metadata);
         let mut seed_bytes = [0u8; 32];
@@ -102,6 +135,8 @@ fn test_burst_limit_enforced() {
         // Should succeed (try_ returns Result)
         let result = client.try_harvest_and_list(&player, &ship.id, &layout, &resource, &10i128);
         assert!(result.is_ok(), "Listing {} should succeed", i);
+
+        env.ledger().with_mut(|li| li.timestamp += 61);
     }
 
     // 6th listing should fail due to session limit

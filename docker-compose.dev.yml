@@ -1,43 +1,120 @@
-version: '3.8'
+# Local development stack.
+# Start everything with:
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# Services:
+#   - stellar: Stellar Quickstart (Horizon + Soroban RPC)
+#   - contract: cargo-watch hot reload against the mounted source
+#   - contract-exporter / prometheus / grafana / alertmanager: monitoring
+
+name: nebula-nomad-dev
 
 services:
-  app:
+  stellar:
+    image: stellar/quickstart:latest
+    container_name: nebula-stellar-quickstart
+    command: --local --enable-soroban-rpc --enable-horizon
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    restart: unless-stopped
+
+  contract:
     build:
       context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgres://user:password@db:5432/sandbox_db
+      dockerfile: Dockerfile.dev
+    container_name: nebula-contract-dev
+    working_dir: /workspace
     volumes:
-      - .:/app
-      - /app/node_modules
+      - .:/workspace
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+      - cargo-target:/workspace/target
+    environment:
+      - CARGO_TERM_COLOR=always
+      - STELLAR_NETWORK=local
+      - HORIZON_URL=http://stellar:8000
+      - SOROBAN_RPC_URL=http://stellar:8000/soroban/rpc
+    command: cargo watch -q -c -w src -w tests -x check -x "test --lib"
     depends_on:
-      - db
+      stellar:
+        condition: service_healthy
+    restart: unless-stopped
 
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=sandbox_db
-    ports:
-      - "5432:5432"
+  contract-exporter:
+    image: python:3.12-slim
+    container_name: nebula-contract-exporter
+    working_dir: /app
     volumes:
-      - sandbox_pgdata:/var/lib/postgresql/data
-      # Optionally, you can map seed scripts if any exist
-      # - ./migrations/seed.sql:/docker-entrypoint-initdb.d/seed.sql
-
-  # Mock service for external APIs
-  mock-service:
-    image: mockserver/mockserver:mockserver-5.14.0
-    ports:
-      - "1080:1080"
+      - ./monitoring/exporters:/app:ro
     environment:
-      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/mockserver-initialization.json
-    # volumes:
-    #   - ./tests/mocks/initialization.json:/config/mockserver-initialization.json
+      - HORIZON_URL=http://stellar:8000
+      - CONTRACT_ID=${CONTRACT_ID:-}
+      - EXPORTER_PORT=9200
+    command: python -u contract_exporter.py
+    ports:
+      - "9200:9200"
+    depends_on:
+      stellar:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: nebula-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - contract-exporter
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: nebula-alertmanager
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: nebula-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
 
 volumes:
-  sandbox_pgdata:
+  cargo-registry:
+  cargo-git:
+  cargo-target:
+  prometheus_data:
+  grafana_data:

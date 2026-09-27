@@ -1,6 +1,6 @@
 //! Player-aware procedural mission generation.
 //!
-use soroban_sdk::{contracttype, symbol_short, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{contracttype, symbol_short, Address, Env, String, Symbol};
 
 use crate::player_profile::get_profile_by_owner;
 use crate::seasons::{get_current_season, SeasonTheme};
@@ -157,7 +157,7 @@ pub fn calculate_adaptive_difficulty(
     // Completion rate adjustment: rewards consistent completion, relieves struggling players.
     // +100 bps max for 100% completion, -50 bps max for <40% completion.
     let completion_adj = if profile.avg_completion_rate >= 80 {
-        ((profile.avg_completion_rate - 80) * 5) // +0 to +100 bps
+        (profile.avg_completion_rate - 80) * 5 // +0 to +100 bps
     } else if profile.avg_completion_rate < 50 {
         // Negative adjustment down to -50 bps
         let deficit = 50 - profile.avg_completion_rate;

@@ -21,7 +21,7 @@ pub enum SessionKey {
 // ─── Data Types ───────────────────────────────────────────────────────────────
 
 /// A timed nebula exploration session tied to a ship.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[contracttype]
 pub struct Session {
     pub id: u64,
@@ -41,6 +41,24 @@ pub enum SessionError {
     SessionExpired = 2,
     TooManySessions = 3,
     NotOwner = 4,
+}
+
+impl crate::error_standard::StandardContractError for SessionError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::SessionNotFound => (ErrorKind::NotFound, false),
+            Self::SessionExpired => (ErrorKind::Conflict, false),
+            Self::TooManySessions => (ErrorKind::ResourceLimit, false),
+            Self::NotOwner => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "session_manager",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 // ─── Functions ────────────────────────────────────────────────────────────────
@@ -177,7 +195,7 @@ mod tests {
             min_persistent_entry_ttl: 1000,
             max_entry_ttl: 10_000,
         });
-        let id = env.register_contract(None, Stub);
+        let id = env.register(Stub, ());
         (env, id)
     }
 

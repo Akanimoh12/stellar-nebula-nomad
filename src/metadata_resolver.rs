@@ -3,9 +3,9 @@ use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Bytes, Env
 /// Maximum number of tokens in a single batch resolve call.
 ///
 /// This is the documented **maximum safe batch size**: at
-/// [`GAS_PER_METADATA_RESOLVE`] gas per item, ten resolutions stay within the
-/// [`DEFAULT_METADATA_GAS_BUDGET`]. Callers that pass their own (smaller) gas
-/// budget should use [`max_batch_for_budget`] to derive a safe size.
+/// `GAS_PER_METADATA_RESOLVE` gas per item, ten resolutions stay within the
+/// `DEFAULT_METADATA_GAS_BUDGET`. Callers that pass their own (smaller) gas
+/// budget should use `max_batch_for_budget` to derive a safe size.
 pub const MAX_METADATA_BATCH: u32 = 10;
 
 /// Estimated gas (abstract units) consumed resolving a single token's
@@ -14,7 +14,7 @@ pub const MAX_METADATA_BATCH: u32 = 10;
 pub const GAS_PER_METADATA_RESOLVE: u64 = 5_000;
 
 /// Default gas budget for a single `batch_resolve_metadata` call.
-/// Sized so the maximum safe batch ([`MAX_METADATA_BATCH`]) fits exactly:
+/// Sized so the maximum safe batch (`MAX_METADATA_BATCH`) fits exactly:
 /// `MAX_METADATA_BATCH * GAS_PER_METADATA_RESOLVE`.
 pub const DEFAULT_METADATA_GAS_BUDGET: u64 = 50_000;
 
@@ -226,6 +226,24 @@ pub enum MetadataError {
     GasBudgetExceeded = 5,
 }
 
+impl crate::error_standard::StandardContractError for MetadataError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidCID => (ErrorKind::Validation, false),
+            Self::TokenNotFound => (ErrorKind::NotFound, false),
+            Self::AlreadySet => (ErrorKind::Conflict, false),
+            Self::BatchLimitExceeded | Self::GasBudgetExceeded => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "metadata_resolver",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Data Types ───────────────────────────────────────────────────────────
 
 /// Resolved metadata for a single token.
@@ -361,7 +379,7 @@ pub fn adjust_batch_to_budget(env: &Env, token_ids: &Vec<u64>, gas_budget: u64) 
 /// Batch resolve metadata for up to 10 tokens in a single call.
 ///
 /// Reduces round-trips for fleet/grid display. Estimates gas up-front against
-/// [`DEFAULT_METADATA_GAS_BUDGET`] and rejects oversized batches before doing
+/// `DEFAULT_METADATA_GAS_BUDGET` and rejects oversized batches before doing
 /// any work. Returns an error if any token ID is not found.
 pub fn batch_resolve_metadata(
     env: &Env,
@@ -373,9 +391,9 @@ pub fn batch_resolve_metadata(
 /// Batch resolve metadata with an explicit `gas_budget`.
 ///
 /// Estimates gas before processing and rejects the call with
-/// [`MetadataError::GasBudgetExceeded`] if the estimate exceeds the budget,
+/// `MetadataError::GasBudgetExceeded` if the estimate exceeds the budget,
 /// preventing mid-batch transaction failures and wasted fees. Callers wanting
-/// best-effort behaviour should pre-trim with [`adjust_batch_to_budget`].
+/// best-effort behaviour should pre-trim with `adjust_batch_to_budget`.
 pub fn batch_resolve_metadata_within_budget(
     env: &Env,
     token_ids: Vec<u64>,

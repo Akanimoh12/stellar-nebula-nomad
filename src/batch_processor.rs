@@ -8,8 +8,8 @@ use crate::error_standard::{ErrorDescriptor, ErrorKind, StandardContractError};
 /// Maximum number of operations per batch.
 ///
 /// This is the documented **maximum safe batch size**: at
-/// [`GAS_PER_BATCH_OP`] gas per operation, eight operations stay within the
-/// [`DEFAULT_BATCH_GAS_BUDGET`]. Use [`max_ops_for_budget`] to derive a safe
+/// `GAS_PER_BATCH_OP` gas per operation, eight operations stay within the
+/// `DEFAULT_BATCH_GAS_BUDGET`. Use `max_ops_for_budget` to derive a safe
 /// size for a smaller, caller-supplied budget.
 pub const MAX_BATCH_SIZE: u32 = 8;
 
@@ -18,7 +18,7 @@ pub const MAX_BATCH_SIZE: u32 = 8;
 pub const GAS_PER_BATCH_OP: u64 = 8_000;
 
 /// Default gas budget for executing a batch. Sized so the maximum safe batch
-/// ([`MAX_BATCH_SIZE`]) fits exactly: `MAX_BATCH_SIZE * GAS_PER_BATCH_OP`.
+/// (`MAX_BATCH_SIZE`) fits exactly: `MAX_BATCH_SIZE * GAS_PER_BATCH_OP`.
 pub const DEFAULT_BATCH_GAS_BUDGET: u64 = 64_000;
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────

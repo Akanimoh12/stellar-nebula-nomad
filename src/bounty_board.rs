@@ -1,9 +1,8 @@
 //! Bounty publication, claiming, and settlement.
 //!
 use soroban_sdk::{
-    contracterror, contracttype, symbol_short, Address, BytesN, Env, Vec, Map, String,
+    contracterror, contracttype, symbol_short, Address, BytesN, Env, String
 };
-
 /// Default bounty expiry duration: 14 days in seconds.
 pub const DEFAULT_BOUNTY_EXPIRY: u64 = 1_209_600;
 
@@ -47,6 +46,25 @@ pub enum BountyError {
     InvalidProof = 7,
     /// Bounty already claimed.
     AlreadyClaimed = 8,
+}
+
+impl crate::error_standard::StandardContractError for BountyError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::BountyNotFound => (ErrorKind::NotFound, false),
+            Self::BountyExpired | Self::AlreadyClaimed => (ErrorKind::Conflict, false),
+            Self::NotPoster | Self::NotAuthorized => (ErrorKind::Authorization, false),
+            Self::TooManyActiveBounties => (ErrorKind::ResourceLimit, false),
+            Self::InvalidReward | Self::InvalidProof => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "bounty_board",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 /// ─── Data Types ─────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 /// Gas-optimized storage utilities
 /// Provides efficient storage patterns for common operations
-use soroban_sdk::{Env, Address, Symbol, Vec, Map};
+use soroban_sdk::{Env, Symbol, Vec};
 
 /// Recommended TTL values for different data types
 pub const TTL_TEMPORARY: u32 = 17_280; // 1 day

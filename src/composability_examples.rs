@@ -30,6 +30,28 @@ pub enum ComposabilityError {
     Reentrancy = 9,
 }
 
+impl crate::error_standard::StandardContractError for ComposabilityError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidTarget | Self::InvalidResponse | Self::InvalidMethod => {
+                (ErrorKind::Validation, false)
+            }
+            Self::CallFailed => (ErrorKind::Internal, false),
+            Self::InputTooLarge => (ErrorKind::ResourceLimit, false),
+            Self::ContractNotFound => (ErrorKind::NotFound, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::Timeout | Self::Reentrancy => (ErrorKind::Conflict, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "composability_examples",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 impl From<ReentrancyError> for ComposabilityError {
     fn from(_: ReentrancyError) -> Self {
         ComposabilityError::Reentrancy

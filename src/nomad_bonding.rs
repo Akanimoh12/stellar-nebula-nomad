@@ -39,6 +39,31 @@ pub enum BondError {
     Reentrancy = 13,
 }
 
+impl crate::error_standard::StandardContractError for BondError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::SelfBond | Self::InvalidPercentage => (ErrorKind::Validation, false),
+            Self::BondNotFound | Self::NoDelegation => (ErrorKind::NotFound, false),
+            Self::NotDesignatedPartner
+            | Self::NotBondMember
+            | Self::NotBeneficiary
+            | Self::NotBondParty => (ErrorKind::Authorization, false),
+            Self::BondNotPending
+            | Self::BondNotActive
+            | Self::AlreadyDissolved
+            | Self::Reentrancy => (ErrorKind::Conflict, false),
+            Self::ArithmeticOverflow => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "nomad_bonding",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 impl From<ReentrancyError> for BondError {
     fn from(_: ReentrancyError) -> Self {
         BondError::Reentrancy

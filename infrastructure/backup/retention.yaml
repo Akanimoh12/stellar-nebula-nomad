@@ -1,0 +1,31 @@
+# Contract state backup retention policy
+# Consumed by scripts/backup.sh (RETENTION_DAYS) and GitHub Actions backup.yml.
+
+schedule:
+  cron: "0 2 * * *"
+  timezone: UTC
+  description: Daily automated Horizon snapshot at 02:00 UTC
+
+retention:
+  local_days: 30
+  github_artifact_days: 30
+  s3_days: 90
+  description: >
+    Local and GitHub artifacts are deleted after 30 days. Optional S3 copies
+    follow a 90-day lifecycle, then expire.
+
+verification:
+  checksum: sha256
+  archive_test: tar -tzf
+  restore_dry_run: true
+
+horizon:
+  testnet: https://horizon-testnet.stellar.org
+  mainnet: https://horizon.stellar.org
+  endpoints:
+    - /ledgers?order=desc&limit=1
+    - /contracts/{contract_id}
+    - /accounts/{contract_id}
+    - /accounts/{contract_id}/effects
+    - /accounts/{contract_id}/operations
+    - /accounts/{contract_id}/transactions

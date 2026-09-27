@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Bytes, BytesN, Env, String, Symbol, Vec};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Address, BytesN, Env, String, Symbol};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -11,6 +11,26 @@ pub enum GovError {
     InsufficientEssence = 5,
     NotDao = 6,
     NotAdmin = 7,
+}
+
+impl crate::error_standard::StandardContractError for GovError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::VotingClosed | Self::AlreadyVoted | Self::QuorumNotMet => {
+                (ErrorKind::Conflict, false)
+            }
+            Self::ProposalNotFound => (ErrorKind::NotFound, false),
+            Self::InsufficientEssence => (ErrorKind::ResourceLimit, false),
+            Self::NotDao | Self::NotAdmin => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "governance",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 #[contracttype]

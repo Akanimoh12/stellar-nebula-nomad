@@ -1,5 +1,5 @@
 use soroban_sdk::{
-    contracterror, contracttype, symbol_short, Address, BytesN, Env, Symbol, Vec,
+    contracterror, contracttype, symbol_short, xdr::ToXdr, Address, BytesN, Env, Symbol, Vec,
 };
 
 use crate::ship_nft::{DataKey as ShipDataKey, ShipNft};
@@ -73,6 +73,28 @@ pub enum SnapshotError {
     BackupTooSoon = 8,
     /// Maximum backup retention limit reached.
     BackupLimitReached = 9,
+}
+
+impl crate::error_standard::StandardContractError for SnapshotError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ShipNotFound | Self::SnapshotNotFound => (ErrorKind::NotFound, false),
+            Self::NotOwner => (ErrorKind::Authorization, false),
+            Self::SnapshotInvalid => (ErrorKind::Validation, false),
+            Self::SessionLimitExceeded | Self::BackupLimitReached => {
+                (ErrorKind::ResourceLimit, false)
+            }
+            Self::TooSoon | Self::BackupTooSoon => (ErrorKind::Conflict, true),
+            Self::SnapshotImmutable => (ErrorKind::Conflict, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "state_snapshot",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 // ─── Data Types ───────────────────────────────────────────────────────────
@@ -539,7 +561,7 @@ pub fn export_state(
     caller.require_auth();
 
     // Verify backup exists
-    let backup: AutomatedBackup = env
+    let _backup: AutomatedBackup = env
         .storage()
         .persistent()
         .get(&SnapshotKey::AutomatedBackup(backup_id))
@@ -593,7 +615,7 @@ pub fn restore_from_backup(
         .ok_or(SnapshotError::SnapshotNotFound)?;
 
     // Verify backup exists
-    let backup: AutomatedBackup = env
+    let _backup: AutomatedBackup = env
         .storage()
         .persistent()
         .get(&SnapshotKey::AutomatedBackup(metadata.backup_id))
@@ -668,6 +690,7 @@ fn compute_backup_hash(
 fn compute_export_checksum(env: &Env, backup_id: u64, storage_uri: &Symbol) -> BytesN<32> {
     let mut data = soroban_sdk::Bytes::new(env);
     data.append(&soroban_sdk::Bytes::from_slice(env, &backup_id.to_be_bytes()));
+    data.append(&storage_uri.clone().to_xdr(env));
 
     env.crypto()
         .sha256(&data)

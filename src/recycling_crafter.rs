@@ -1,7 +1,6 @@
 use soroban_sdk::{
-    contracterror, contracttype, symbol_short, vec, Address, Env, Vec, Map, Symbol,
+    contracterror, contracttype, symbol_short, Address, Env, Vec, Symbol
 };
-
 /// Maximum batch size for recycle/craft operations.
 pub const RECYCLE_CRAFT_BATCH_SIZE: u32 = 8;
 
@@ -34,6 +33,23 @@ pub enum RecyclingError {
     InsufficientResources = 4,
     /// Crafted item already exists (idempotency guard).
     AlreadyCrafted = 5,
+}
+
+impl crate::error_standard::StandardContractError for RecyclingError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidRecipe | Self::InvalidInputs => (ErrorKind::Validation, false),
+            Self::BatchTooLarge | Self::InsufficientResources => (ErrorKind::ResourceLimit, false),
+            Self::AlreadyCrafted => (ErrorKind::Conflict, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "recycling_crafter",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 /// ─── Data Types ─────────────────────────────────────────────────────────────

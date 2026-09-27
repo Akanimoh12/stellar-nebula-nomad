@@ -34,6 +34,23 @@ pub enum EnergyError {
     NegativeBalance = 5,
 }
 
+impl crate::error_standard::StandardContractError for EnergyError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InsufficientEnergy | Self::EnergyOverflow => (ErrorKind::ResourceLimit, false),
+            Self::ShipNotFound => (ErrorKind::NotFound, false),
+            Self::InvalidAmount | Self::NegativeBalance => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "energy_manager",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 #[contracttype]
 pub struct EnergyBalance {

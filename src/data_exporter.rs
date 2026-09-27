@@ -23,6 +23,23 @@ pub enum ExportError {
     ProfileNotFound = 3,
 }
 
+impl crate::error_standard::StandardContractError for ExportError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ExportLimitExceeded => (ErrorKind::ResourceLimit, false),
+            Self::NotOptedIn => (ErrorKind::Authorization, false),
+            Self::ProfileNotFound => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "data_exporter",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 #[contracttype]
 pub struct ExportSettings {

@@ -46,6 +46,25 @@ pub enum PortalError {
     SameNebula = 5,
 }
 
+impl crate::error_standard::StandardContractError for PortalError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::PortalUnstable => (ErrorKind::Conflict, false),
+            Self::NotAuthorized => (ErrorKind::Authorization, false),
+            Self::PortalNotFound => (ErrorKind::NotFound, false),
+            Self::BatchTooLarge => (ErrorKind::ResourceLimit, false),
+            Self::SameNebula => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "portal_registry",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Data Types ─────────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, PartialEq)]

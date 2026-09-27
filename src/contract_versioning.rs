@@ -1,9 +1,8 @@
 //! Contract version metadata and compatibility checks.
 //!
 use soroban_sdk::{
-    contracterror, contracttype, symbol_short, Address, Bytes, Env, Vec, Map,
+    contracterror, contracttype, symbol_short, Address, Bytes, Env, Vec
 };
-
 /// Current contract version (starts at 1 at deployment).
 pub const CURRENT_VERSION: u32 = 1;
 
@@ -41,6 +40,24 @@ pub enum VersioningError {
     BatchTooLarge = 4,
     /// Caller is not authorized to trigger migration.
     NotAuthorized = 5,
+}
+
+impl crate::error_standard::StandardContractError for VersioningError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::IncompatibleVersion | Self::AlreadyMigrated => (ErrorKind::Conflict, false),
+            Self::MigrationInProgress => (ErrorKind::Conflict, true),
+            Self::BatchTooLarge => (ErrorKind::ResourceLimit, false),
+            Self::NotAuthorized => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "contract_versioning",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 /// ─── Data Types ─────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-use soroban_sdk::{symbol_short, Address, Env, Symbol};
+use soroban_sdk::{symbol_short, Address, Env};
 use crate::notifications::push_service::emit_notification;
 
 pub fn check_low_resources(env: &Env, player: Address, balance: u32, threshold: u32) {

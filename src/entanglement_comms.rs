@@ -41,6 +41,25 @@ pub enum EntanglementError {
     EmptyBatch = 6,
 }
 
+impl crate::error_standard::StandardContractError for EntanglementError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::PairNotActive => (ErrorKind::Conflict, false),
+            Self::NotAuthorized => (ErrorKind::Authorization, false),
+            Self::PairNotFound => (ErrorKind::NotFound, false),
+            Self::SameShip | Self::EmptyBatch => (ErrorKind::Validation, false),
+            Self::BurstTooLarge => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "entanglement_comms",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Data Types ─────────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, PartialEq)]

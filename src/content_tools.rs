@@ -1,10 +1,9 @@
 //! Administrative tools for managed game content.
 //!
-use soroban_sdk::{
-    contracterror, contracttype, symbol_short, Address, Bytes, Env, Map, String, Symbol, Vec,
-};
-
 use crate::input_validation;
+use soroban_sdk::{
+    contracterror, contracttype, symbol_short, Address, Bytes, Env, String, Symbol, Vec,
+};
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
@@ -32,6 +31,29 @@ pub enum ContentToolsError {
     ContentRejected = 9,
     /// Admin has already been set; set_admin is a one-time initializer (Issue #237).
     AlreadyInitialized = 10,
+}
+
+impl crate::error_standard::StandardContractError for ContentToolsError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ContentAlreadyExists
+            | Self::AlreadyVoted
+            | Self::UnderReview
+            | Self::ContentRejected
+            | Self::AlreadyInitialized => (ErrorKind::Conflict, false),
+            Self::ContentNotFound => (ErrorKind::NotFound, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::InvalidContent | Self::InvalidRating => (ErrorKind::Validation, false),
+            Self::ContentLimitReached => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "content_tools",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 // ── Storage Keys ──────────────────────────────────────────────────────────────

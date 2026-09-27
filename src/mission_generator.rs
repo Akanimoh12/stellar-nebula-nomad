@@ -23,6 +23,24 @@ pub enum MissionError {
     ProfileNotFound = 5,
 }
 
+impl crate::error_standard::StandardContractError for MissionError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::MissionAlreadyClaimed | Self::NotCompleted => (ErrorKind::Conflict, false),
+            Self::InvalidMission => (ErrorKind::Validation, false),
+            Self::DailyLimitReached => (ErrorKind::ResourceLimit, true),
+            Self::ProfileNotFound => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "mission_generator",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 #[contracttype]
 pub struct Mission {

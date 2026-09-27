@@ -58,6 +58,25 @@ pub enum BlueprintError {
     BatchTooLarge = 5,
 }
 
+impl crate::error_standard::StandardContractError for BlueprintError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::BlueprintNotFound => (ErrorKind::NotFound, false),
+            Self::InvalidComponents => (ErrorKind::Validation, false),
+            Self::AlreadyApplied => (ErrorKind::Conflict, false),
+            Self::NotOwner => (ErrorKind::Authorization, false),
+            Self::BatchTooLarge => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "blueprint_factory",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 fn rarity_from_components(count: u32) -> BlueprintRarity {

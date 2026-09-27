@@ -26,25 +26,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-
-      - name: Install Stellar CLI
-        run: |
-          cargo install --locked stellar-cli --version 21.0.0
-          stellar --version
-
       - name: Create backup directory
         run: mkdir -p backups
 
-      - name: Run backup script
+      - name: Run backup script (Horizon snapshots)
         env:
           CONTRACT_ID: ${{ secrets.CONTRACT_ID }}
           STELLAR_NETWORK: ${{ github.event.inputs.network || 'testnet' }}
           RPC_URL: ${{ secrets.RPC_URL }}
+          HORIZON_URL: ${{ secrets.HORIZON_URL }}
           RETENTION_DAYS: 30
         run: |
           chmod +x scripts/backup.sh

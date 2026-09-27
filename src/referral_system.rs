@@ -65,6 +65,27 @@ pub enum ReferralError {
     InsufficientRewardPool = 7,
 }
 
+impl crate::error_standard::StandardContractError for ReferralError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::AlreadyReferred | Self::AlreadyClaimed | Self::FirstScanNotDone => {
+                (ErrorKind::Conflict, false)
+            }
+            Self::SelfReferral => (ErrorKind::Validation, false),
+            Self::ReferralNotFound => (ErrorKind::NotFound, false),
+            Self::DailyClaimCapReached => (ErrorKind::ResourceLimit, true),
+            Self::InsufficientRewardPool => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "referral_system",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Admin Functions ──────────────────────────────────────────────────────────
 
 /// Deposit `amount` essence into the global reward pool.
@@ -369,6 +390,23 @@ pub enum ReferralV2Error {
     VelocityTooHigh = 11,
     /// Tier not found.
     TierNotFound = 12,
+}
+
+impl crate::error_standard::StandardContractError for ReferralV2Error {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::PlayerBlocked => (ErrorKind::Authorization, false),
+            Self::VelocityTooHigh => (ErrorKind::Validation, false),
+            Self::TierNotFound => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "referral_system",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 const VELOCITY_WINDOW: u64 = 3_600; // 1 hour

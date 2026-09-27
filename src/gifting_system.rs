@@ -33,6 +33,26 @@ pub enum GiftError {
     BurstLimitExceeded = 8,
 }
 
+impl crate::error_standard::StandardContractError for GiftError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ZeroAmount | Self::SelfGift => (ErrorKind::Validation, false),
+            Self::InsufficientBalance => (ErrorKind::ResourceLimit, false),
+            Self::GiftNotFound => (ErrorKind::NotFound, false),
+            Self::GiftExpired | Self::GiftAlreadyClaimed => (ErrorKind::Conflict, false),
+            Self::NotReceiver => (ErrorKind::Authorization, false),
+            Self::BurstLimitExceeded => (ErrorKind::ResourceLimit, true),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "gifting_system",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ── Data Structures ───────────────────────────────────────────────────────
 
 #[derive(Clone)]

@@ -42,6 +42,21 @@ pub enum ReentrancyError {
     ReentrantCall = 1,
 }
 
+impl crate::error_standard::StandardContractError for ReentrancyError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ReentrantCall => (ErrorKind::Conflict, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "reentrancy_guard",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 /// Acquire the global reentrancy lock.
 ///
 /// Returns [`ReentrancyError::ReentrantCall`] if the lock is already held,

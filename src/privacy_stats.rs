@@ -52,6 +52,25 @@ pub enum PrivacyError {
     CommitmentExists = 5,
 }
 
+impl crate::error_standard::StandardContractError for PrivacyError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::NotOptedIn => (ErrorKind::Authorization, false),
+            Self::InvalidProof => (ErrorKind::Validation, false),
+            Self::CommitmentNotFound => (ErrorKind::NotFound, false),
+            Self::BurstLimitExceeded => (ErrorKind::ResourceLimit, true),
+            Self::CommitmentExists => (ErrorKind::Conflict, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "privacy_stats",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
 /// Compute a simple commitment hash: hash(stat_type || value || player || timestamp).

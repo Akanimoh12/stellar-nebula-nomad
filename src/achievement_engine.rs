@@ -1,6 +1,6 @@
 //! Achievement eligibility evaluation and badge issuance.
 //!
-use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Env, String, Vec};
 
 use crate::health_monitor;
 use crate::player_profile::{get_profile_by_owner, mark_achievement_unlocked};
@@ -28,6 +28,24 @@ pub enum AchievementError {
     ProfileNotFound = 3,
     NotEligible = 4,
     BatchTooLarge = 5,
+}
+
+impl crate::error_standard::StandardContractError for AchievementError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::AlreadyUnlocked => (ErrorKind::Conflict, false),
+            Self::TemplateNotFound | Self::ProfileNotFound => (ErrorKind::NotFound, false),
+            Self::NotEligible => (ErrorKind::Authorization, false),
+            Self::BatchTooLarge => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "achievement_engine",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

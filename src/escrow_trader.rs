@@ -29,6 +29,27 @@ pub enum EscrowError {
     Reentrancy = 8,
 }
 
+impl crate::error_standard::StandardContractError for EscrowError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::TradeExpired | Self::AlreadyConfirmed | Self::Reentrancy => {
+                (ErrorKind::Conflict, false)
+            }
+            Self::NotParticipant => (ErrorKind::Authorization, false),
+            Self::EscrowNotFound => (ErrorKind::NotFound, false),
+            Self::MaxEscrowsReached | Self::NotFullyConfirmed => (ErrorKind::ResourceLimit, false),
+            Self::InvalidAssets => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "escrow_trader",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 impl From<ReentrancyError> for EscrowError {
     fn from(_: ReentrancyError) -> Self {
         EscrowError::Reentrancy

@@ -224,6 +224,35 @@ pub enum QuestError {
     DanglingBranch = 16,
 }
 
+impl crate::error_standard::StandardContractError for QuestError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ChainNotFound | Self::QuestNotFound | Self::ProfileNotFound => {
+                (ErrorKind::NotFound, false)
+            }
+            Self::QuestNotStarted
+            | Self::InvalidStatus
+            | Self::QuestExpired
+            | Self::AlreadyClaimed
+            | Self::ChainAlreadyStarted => (ErrorKind::Conflict, false),
+            Self::ChainFull
+            | Self::TooManyBranches
+            | Self::TooManyActiveQuests
+            | Self::ArithmeticOverflow => (ErrorKind::ResourceLimit, false),
+            Self::InvalidBranch | Self::InvalidTarget => (ErrorKind::Validation, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::DanglingBranch => (ErrorKind::Internal, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "quest_system",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 impl From<ProfileError> for QuestError {
     fn from(e: ProfileError) -> Self {
         match e {

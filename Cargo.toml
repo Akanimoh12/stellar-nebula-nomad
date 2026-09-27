@@ -79,6 +79,10 @@ path = "tests/fuzz/fuzz_trading.rs"
 name = "fuzz_yield"
 path = "tests/fuzz/fuzz_yield.rs"
 
+[[test]]
+name = "fuzz_comprehensive"
+path = "tests/fuzz/fuzz_comprehensive.rs"
+
 # Economy & DeFi mechanics: staking, yield, DEX, sponsorship, batching
 [[test]]
 name = "test_batch_processor"
@@ -87,6 +91,10 @@ path = "tests/economy/test_batch_processor.rs"
 [[test]]
 name = "test_dex_integration"
 path = "tests/economy/test_dex_integration.rs"
+
+[[test]]
+name = "test_dynamic_pricing"
+path = "tests/economy/test_dynamic_pricing.rs"
 
 [[test]]
 name = "test_fractional_resources"
@@ -116,6 +124,16 @@ path = "tests/governance/test_dao.rs"
 [[test]]
 name = "test_emergency_controls"
 path = "tests/governance/test_emergency_controls.rs"
+
+# Comprehensive audit logging integration (Issue #425)
+[[test]]
+name = "test_audit_integration"
+path = "tests/governance/test_audit_integration.rs"
+
+# Emergency controls integration with contract operations (Issue #426)
+[[test]]
+name = "test_emergency_controls_integration"
+path = "tests/governance/test_emergency_controls_integration.rs"
 
 [[test]]
 name = "test_governance"
@@ -157,6 +175,10 @@ path = "tests/gameplay/test_seasonal_content.rs"
 [[test]]
 name = "test_seasonal_events"
 path = "tests/gameplay/test_seasonal_events.rs"
+
+[[test]]
+name = "test_ship_repair"
+path = "tests/gameplay/test_ship_repair.rs"
 
 [[test]]
 name = "test_ship_upgrade"
@@ -236,6 +258,21 @@ path = "tests/misc/test_new_features_combined.rs"
 name = "test_new_modules"
 path = "tests/misc/test_new_modules.rs"
 
+# symbol_short! 9-char limit guard (Issues #392, #393)
+[[test]]
+name = "test_symbol_lengths"
+path = "tests/misc/test_symbol_lengths.rs"
+
+# End-to-end integration test suite (Issue #427)
+[[test]]
+name = "test_e2e_flows"
+path = "tests/integration/test_e2e_flows.rs"
+
+# Property tests for nebula_gen determinism (Issue #428)
+[[test]]
+name = "test_nebula_gen_properties"
+path = "tests/property_tests/nebula_gen_tests.rs"
+
 [features]
 # Enable advanced fuzz / property-based testing helpers.
 # Usage: cargo test --features fuzz
@@ -251,6 +288,8 @@ libm = "0.2"
 soroban-sdk = { version = "22.0", features = ["testutils"] }
 proptest = "=1.6.0"
 rand = "=0.8.5"
+
+
 
 [profile.release]
 # Optimize strictly for binary size — critical for Soroban WASM deployment.

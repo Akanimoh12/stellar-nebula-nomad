@@ -131,6 +131,25 @@ pub enum BattlePassError {
     ChallengeXpAlreadyGranted = 7,
 }
 
+impl crate::error_standard::StandardContractError for BattlePassError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::NotEnoughXP => (ErrorKind::ResourceLimit, false),
+            Self::AlreadyClaimed | Self::ChallengeXpAlreadyGranted => (ErrorKind::Conflict, false),
+            Self::InvalidTier | Self::TierOutOfRange => (ErrorKind::Validation, false),
+            Self::NoActiveSeason => (ErrorKind::NotFound, false),
+            Self::PremiumRequired => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "battle_pass",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── XP Accumulation ──────────────────────────────────────────────────────────
 
 /// Add XP to a player's battle pass for the current season based on scan and

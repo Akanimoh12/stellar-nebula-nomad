@@ -4,7 +4,7 @@ This is the reference for every contract error in Stellar Nebula Nomad: what
 each code means, what usually causes it, and how a client should handle it.
 
 - **Scope:** every `#[contracterror]` enum under `src/`. That is 115 enums
-  with 745 codes, including a few modules not yet wired into `src/lib.rs`
+  with 766 codes, including a few modules not yet wired into `src/lib.rs`
   (marked ⚠️ below).
 - **Related docs:** [ERROR_HANDLING.md](ERROR_HANDLING.md) covers how to
   *add* errors and the `StandardContractError` descriptor convention. This
@@ -85,7 +85,7 @@ main contract:
 
 | Range | Module |
 |------:|--------|
-| 100–101 | `rate_limiter::RateLimitError` |
+| 100–102 | `rate_limiter::RateLimitError` |
 | 200–205 | `resource_minter::MinterError` |
 
 Some enum **names** repeat across modules (`OracleError` in `market_oracle`
@@ -290,120 +290,120 @@ a runnable version.
 | Module | Enum | Variants | Codes | Built | Std |
 |--------|------|---------:|-------|:-----:|:---:|
 | [`access_control`](#access-control-accesscontrolerror) | `AccessControlError` | 17 | 1–17 | ✅ | ✅ |
-| [`achievement_engine`](#achievement-engine-achievementerror) | `AchievementError` | 5 | 1–5 | ✅ |  |
+| [`achievement_engine`](#achievement-engine-achievementerror) | `AchievementError` | 5 | 1–5 | ✅ | ✅ |
 | [`achievements`](#achievements-achievementserror) | `AchievementsError` | 2 | 1–2 | ⚠️ not built |  |
-| [`alliance_manager`](#alliance-manager-allianceerror) | `AllianceError` | 7 | 1–7 | ✅ |  |
+| [`alliance_manager`](#alliance-manager-allianceerror) | `AllianceError` | 7 | 1–7 | ✅ | ✅ |
 | [`analytics`](#analytics-analyticserror) | `AnalyticsError` | 1 | 1–1 | ✅ | ✅ |
-| [`anomaly_classifier`](#anomaly-classifier-anomalyerror) | `AnomalyError` | 3 | 1–3 | ✅ |  |
-| [`audio_seed_generator`](#audio-seed-generator-audioerror) | `AudioError` | 4 | 1–4 | ✅ |  |
-| [`audit_logger`](#audit-logger-auditloggererror) | `AuditLoggerError` | 3 | 1–3 | ✅ |  |
+| [`anomaly_classifier`](#anomaly-classifier-anomalyerror) | `AnomalyError` | 3 | 1–3 | ✅ | ✅ |
+| [`audio_seed_generator`](#audio-seed-generator-audioerror) | `AudioError` | 4 | 1–4 | ✅ | ✅ |
+| [`audit_logger`](#audit-logger-auditloggererror) | `AuditLoggerError` | 3 | 1–3 | ✅ | ✅ |
 | [`badges`](#badges-badgeerror) | `BadgeError` | 4 | 1–4 | ⚠️ not built |  |
 | [`batch_processor`](#batch-processor-batcherror) | `BatchError` | 5 | 1–5 | ✅ | ✅ |
-| [`battle_pass`](#battle-pass-battlepasserror) | `BattlePassError` | 7 | 1–7 | ✅ |  |
-| [`blueprint_factory`](#blueprint-factory-blueprinterror) | `BlueprintError` | 5 | 1–5 | ✅ |  |
+| [`battle_pass`](#battle-pass-battlepasserror) | `BattlePassError` | 7 | 1–7 | ✅ | ✅ |
+| [`blueprint_factory`](#blueprint-factory-blueprinterror) | `BlueprintError` | 5 | 1–5 | ✅ | ✅ |
 | [`bot_detection`](#bot-detection-boterror) | `BotError` | 6 | 1–6 | ⚠️ not built |  |
-| [`bounty_board`](#bounty-board-bountyerror) | `BountyError` | 8 | 1–8 | ✅ |  |
+| [`bounty_board`](#bounty-board-bountyerror) | `BountyError` | 8 | 1–8 | ✅ | ✅ |
 | [`bridge::ethereum`](#bridge-ethereum-bridgeerror) | `BridgeError` | 11 | 1–11 | ⚠️ not built |  |
 | [`bridge::stellar_ethereum`](#bridge-stellar-ethereum-bridgeerror) | `BridgeError` | 11 | 90–100 | ⚠️ not built |  |
 | [`bridge::validator`](#bridge-validator-validatorerror) | `ValidatorError` | 9 | 1–9 | ⚠️ not built |  |
 | [`bug_bounty_payout`](#bug-bounty-payout-bountyerror) | `BountyError` | 11 | 1–11 | ⚠️ not built |  |
-| [`cache_ttl_manager`](#cache-ttl-manager-cachettlerror) | `CacheTtlError` | 5 | 1–5 | ✅ |  |
+| [`cache_ttl_manager`](#cache-ttl-manager-cachettlerror) | `CacheTtlError` | 5 | 1–5 | ✅ | ✅ |
 | [`clan_wars`](#clan-wars-warerror) | `WarError` | 11 | 1–11 | ⚠️ not built |  |
-| [`composability_examples`](#composability-examples-composabilityerror) | `ComposabilityError` | 9 | 1–9 | ✅ |  |
+| [`composability_examples`](#composability-examples-composabilityerror) | `ComposabilityError` | 9 | 1–9 | ✅ | ✅ |
 | [`config_updater`](#config-updater-configerror) | `ConfigError` | 9 | 1–9 | ⚠️ not built |  |
-| [`constellation_mapper`](#constellation-mapper-constellationerror) | `ConstellationError` | 4 | 1–4 | ✅ |  |
-| [`content_tools`](#content-tools-contenttoolserror) | `ContentToolsError` | 10 | 1–10 | ✅ |  |
-| [`contract_versioning`](#contract-versioning-versioningerror) | `VersioningError` | 5 | 1–5 | ✅ |  |
-| [`crafting`](#crafting-craftingerror) | `CraftingError` | 9 | 1–9 | ✅ |  |
+| [`constellation_mapper`](#constellation-mapper-constellationerror) | `ConstellationError` | 4 | 1–4 | ✅ | ✅ |
+| [`content_tools`](#content-tools-contenttoolserror) | `ContentToolsError` | 10 | 1–10 | ✅ | ✅ |
+| [`contract_versioning`](#contract-versioning-versioningerror) | `VersioningError` | 5 | 1–5 | ✅ | ✅ |
+| [`crafting`](#crafting-craftingerror) | `CraftingError` | 9 | 1–9 | ✅ | ✅ |
 | [`daily_rewards`](#daily-rewards-dailyrewarderror) | `DailyRewardError` | 4 | 1–4 | ⚠️ not built |  |
 | [`dao`](#dao-daoerror) | `DaoError` | 14 | 1–14 | ⚠️ not built |  |
-| [`data_exporter`](#data-exporter-exporterror) | `ExportError` | 3 | 1–3 | ✅ |  |
-| [`dex_integration`](#dex-integration-harvesterror) | `HarvestError` | 2 | 1–2 | ✅ |  |
-| [`difficulty_curve`](#difficulty-curve-curveerror) | `CurveError` | 5 | 1–5 | ✅ |  |
-| [`difficulty_scaler`](#difficulty-scaler-difficultyerror) | `DifficultyError` | 1 | 1–1 | ✅ |  |
-| [`emergency_controls`](#emergency-controls-emergencyerror) | `EmergencyError` | 6 | 1–6 | ✅ |  |
-| [`energy_manager`](#energy-manager-energyerror) | `EnergyError` | 5 | 1–5 | ✅ |  |
-| [`entanglement_comms`](#entanglement-comms-entanglementerror) | `EntanglementError` | 6 | 1–6 | ✅ |  |
-| [`environment_simulator`](#environment-simulator-environmenterror) | `EnvironmentError` | 3 | 1–3 | ✅ |  |
+| [`data_exporter`](#data-exporter-exporterror) | `ExportError` | 3 | 1–3 | ✅ | ✅ |
+| [`difficulty_curve`](#difficulty-curve-curveerror) | `CurveError` | 5 | 1–5 | ✅ | ✅ |
+| [`difficulty_scaler`](#difficulty-scaler-difficultyerror) | `DifficultyError` | 1 | 1–1 | ✅ | ✅ |
+| [`emergency_controls`](#emergency-controls-emergencyerror) | `EmergencyError` | 6 | 1–6 | ✅ | ✅ |
+| [`energy_manager`](#energy-manager-energyerror) | `EnergyError` | 5 | 1–5 | ✅ | ✅ |
+| [`entanglement_comms`](#entanglement-comms-entanglementerror) | `EntanglementError` | 6 | 1–6 | ✅ | ✅ |
+| [`environment_simulator`](#environment-simulator-environmenterror) | `EnvironmentError` | 3 | 1–3 | ✅ | ✅ |
 | [`errors`](#errors-bondingerror) | `BondingError` | 6 | 400–405 | ⚠️ not built |  |
 | [`errors`](#errors-mintererror) | `MinterError` | 5 | 200–204 | ⚠️ not built |  |
 | [`errors`](#errors-nebulagenerror) | `NebulaGenError` | 5 | 1–5 | ⚠️ not built |  |
 | [`errors`](#errors-ratelimiterror) | `RateLimitError` | 2 | 100–101 | ⚠️ not built |  |
 | [`errors`](#errors-shipregistryerror) | `ShipRegistryError` | 5 | 300–304 | ⚠️ not built |  |
-| [`escrow_trader`](#escrow-trader-escrowerror) | `EscrowError` | 8 | 1–8 | ✅ |  |
+| [`escrow_trader`](#escrow-trader-escrowerror) | `EscrowError` | 8 | 1–8 | ✅ | ✅ |
 | [`event_framework`](#event-framework-eventframeworkerror) | `EventFrameworkError` | 3 | 1–3 | ⚠️ not built |  |
-| [`event_scheduler`](#event-scheduler-eventerror) | `EventError` | 14 | 1–14 | ✅ |  |
+| [`event_scheduler`](#event-scheduler-eventerror) | `EventError` | 24 | 1–24 | ✅ | ✅ |
 | [`exploration_heatmap`](#exploration-heatmap-heatmaperror) | `HeatmapError` | 1 | 1–1 | ✅ | ✅ |
 | [`fleet_manager`](#fleet-manager-fleeterror) | `FleetError` | 7 | 1–7 | ⚠️ not built |  |
-| [`fractional_resources`](#fractional-resources-fractionalerror) | `FractionalError` | 10 | 1–10 | ✅ |  |
+| [`fractional_resources`](#fractional-resources-fractionalerror) | `FractionalError` | 10 | 1–10 | ✅ | ✅ |
 | [`fraud_detection`](#fraud-detection-frauderror) | `FraudError` | 1 | 1–1 | ✅ | ✅ |
-| [`gas_recovery`](#gas-recovery-refunderror) | `RefundError` | 5 | 1–5 | ✅ |  |
-| [`gas_sponsor`](#gas-sponsor-sponsorerror) | `SponsorError` | 12 | 1–12 | ✅ |  |
-| [`gifting_system`](#gifting-system-gifterror) | `GiftError` | 8 | 1–8 | ✅ |  |
-| [`governance`](#governance-goverror) | `GovError` | 7 | 1–7 | ✅ |  |
+| [`gas_recovery`](#gas-recovery-refunderror) | `RefundError` | 5 | 1–5 | ✅ | ✅ |
+| [`gas_sponsor`](#gas-sponsor-sponsorerror) | `SponsorError` | 12 | 1–12 | ✅ | ✅ |
+| [`gifting_system`](#gifting-system-gifterror) | `GiftError` | 8 | 1–8 | ✅ | ✅ |
+| [`governance`](#governance-goverror) | `GovError` | 7 | 1–7 | ✅ | ✅ |
 | [`guild_economy`](#guild-economy-guildeconomyerror) | `GuildEconomyError` | 8 | 1–8 | ⚠️ not built |  |
-| [`guild_quests`](#guild-quests-guildquesterror) | `GuildQuestError` | 5 | 1–5 | ✅ |  |
-| [`health_monitor`](#health-monitor-healtherror) | `HealthError` | 2 | 1–2 | ✅ |  |
-| [`indexer_callbacks`](#indexer-callbacks-indexererror) | `IndexerError` | 3 | 1–3 | ✅ |  |
-| [`input_validation`](#input-validation-validationerror) | `ValidationError` | 5 | 80–84 | ✅ |  |
-| [`leaderboards`](#leaderboards-leaderboarderror) | `LeaderboardError` | 8 | 1–8 | ✅ |  |
+| [`guild_quests`](#guild-quests-guildquesterror) | `GuildQuestError` | 5 | 1–5 | ✅ | ✅ |
+| [`health_monitor`](#health-monitor-healtherror) | `HealthError` | 2 | 1–2 | ✅ | ✅ |
+| [`indexer_callbacks`](#indexer-callbacks-indexererror) | `IndexerError` | 3 | 1–3 | ✅ | ✅ |
+| [`input_validation`](#input-validation-validationerror) | `ValidationError` | 5 | 80–84 | ✅ | ✅ |
+| [`leaderboards`](#leaderboards-leaderboarderror) | `LeaderboardError` | 8 | 1–8 | ✅ | ✅ |
 | [`loot_system`](#loot-system-looterror) | `LootError` | 9 | 1–9 | ⚠️ not built |  |
-| [`market_oracle`](#market-oracle-oracleerror) | `OracleError` | 8 | 1–8 | ✅ |  |
-| [`metadata_resolver`](#metadata-resolver-metadataerror) | `MetadataError` | 5 | 1–5 | ✅ |  |
-| [`metrics_exporter`](#metrics-exporter-metricserror) | `MetricsError` | 3 | 1–3 | ✅ |  |
-| [`migration_framework`](#migration-framework-migrationerror) | `MigrationError` | 8 | 1–8 | ✅ |  |
+| [`market_oracle`](#market-oracle-oracleerror) | `OracleError` | 8 | 1–8 | ✅ | ✅ |
+| [`metadata_resolver`](#metadata-resolver-metadataerror) | `MetadataError` | 5 | 1–5 | ✅ | ✅ |
+| [`metrics_exporter`](#metrics-exporter-metricserror) | `MetricsError` | 3 | 1–3 | ✅ | ✅ |
+| [`migration_framework`](#migration-framework-migrationerror) | `MigrationError` | 8 | 1–8 | ✅ | ✅ |
 | [`mini_games`](#mini-games-minigameerror) | `MiniGameError` | 9 | 1–9 | ⚠️ not built |  |
-| [`mission_generator`](#mission-generator-missionerror) | `MissionError` | 5 | 1–5 | ✅ |  |
-| [`mobile_views`](#mobile-views-mobileviewerror) | `MobileViewError` | 1 | 1–1 | ✅ |  |
-| [`navigation_planner`](#navigation-planner-naverror) | `NavError` | 8 | 1–8 | ✅ |  |
+| [`mission_generator`](#mission-generator-missionerror) | `MissionError` | 5 | 1–5 | ✅ | ✅ |
+| [`mobile_views`](#mobile-views-mobileviewerror) | `MobileViewError` | 1 | 1–1 | ✅ | ✅ |
+| [`navigation_planner`](#navigation-planner-naverror) | `NavError` | 8 | 1–8 | ✅ | ✅ |
 | [`nebula_archive`](#nebula-archive-archiveerror) | `ArchiveError` | 2 | 1–2 | ⚠️ not built |  |
-| [`nebula_gen`](#nebula-gen-nebulaerror) | `NebulaError` | 10 | 1–10 | ✅ |  |
-| [`nft_marketplace`](#nft-marketplace-marketplaceerror) | `MarketplaceError` | 14 | 1–14 | ✅ |  |
-| [`nomad_bonding`](#nomad-bonding-bonderror) | `BondError` | 13 | 1–13 | ✅ |  |
+| [`nebula_gen`](#nebula-gen-nebulaerror) | `NebulaError` | 11 | 1–11 | ✅ | ✅ |
+| [`nft_marketplace`](#nft-marketplace-marketplaceerror) | `MarketplaceError` | 14 | 1–14 | ✅ | ✅ |
+| [`nomad_bonding`](#nomad-bonding-bonderror) | `BondError` | 13 | 1–13 | ✅ | ✅ |
 | [`offline_progress`](#offline-progress-offlineerror) | `OfflineError` | 2 | 1–2 | ⚠️ not built |  |
-| [`onboarding_tutorial`](#onboarding-tutorial-onboardingerror) | `OnboardingError` | 11 | 1–11 | ✅ |  |
-| [`player_profile`](#player-profile-profileerror) | `ProfileError` | 5 | 1–5 | ✅ |  |
+| [`onboarding_tutorial`](#onboarding-tutorial-onboardingerror) | `OnboardingError` | 11 | 1–11 | ✅ | ✅ |
+| [`player_profile`](#player-profile-profileerror) | `ProfileError` | 5 | 1–5 | ✅ | ✅ |
 | [`player_segmentation`](#player-segmentation-segmentationerror) | `SegmentationError` | 2 | 1–2 | ✅ | ✅ |
-| [`portal_registry`](#portal-registry-portalerror) | `PortalError` | 5 | 1–5 | ✅ |  |
-| [`privacy_stats`](#privacy-stats-privacyerror) | `PrivacyError` | 5 | 1–5 | ✅ |  |
-| [`prize_distributor`](#prize-distributor-prizeerror) | `PrizeError` | 6 | 1–6 | ✅ |  |
+| [`portal_registry`](#portal-registry-portalerror) | `PortalError` | 5 | 1–5 | ✅ | ✅ |
+| [`privacy_stats`](#privacy-stats-privacyerror) | `PrivacyError` | 5 | 1–5 | ✅ | ✅ |
+| [`prize_distributor`](#prize-distributor-prizeerror) | `PrizeError` | 6 | 1–6 | ✅ | ✅ |
 | [`proxy`](#proxy-proxyerror) | `ProxyError` | 6 | 1–6 | ⚠️ not built |  |
-| [`pvp_combat`](#pvp-combat-pvperror) | `PvPError` | 13 | 1–13 | ✅ |  |
-| [`quest_system`](#quest-system-questerror) | `QuestError` | 16 | 1–16 | ✅ |  |
-| [`randomness_oracle`](#randomness-oracle-oracleerror) | `OracleError` | 2 | 1–2 | ✅ |  |
-| [`rate_limiter`](#rate-limiter-ratelimiterror) | `RateLimitError` | 2 | 100–101 | ✅ |  |
+| [`pvp_combat`](#pvp-combat-pvperror) | `PvPError` | 13 | 1–13 | ✅ | ✅ |
+| [`quest_system`](#quest-system-questerror) | `QuestError` | 16 | 1–16 | ✅ | ✅ |
+| [`randomness_oracle`](#randomness-oracle-oracleerror) | `OracleError` | 2 | 1–2 | ✅ | ✅ |
+| [`rate_limiter`](#rate-limiter-ratelimiterror) | `RateLimitError` | 3 | 100–102 | ✅ | ✅ |
 | [`realtime_events`](#realtime-events-realtimeerror) | `RealtimeError` | 13 | 110–122 | ⚠️ not built |  |
-| [`recipes`](#recipes-recipeerror) | `RecipeError` | 1 | 1–1 | ✅ |  |
-| [`recycling_crafter`](#recycling-crafter-recyclingerror) | `RecyclingError` | 5 | 1–5 | ✅ |  |
-| [`reentrancy_guard`](#reentrancy-guard-reentrancyerror) | `ReentrancyError` | 1 | 1–1 | ✅ |  |
-| [`referral_system`](#referral-system-referralerror) | `ReferralError` | 7 | 1–7 | ✅ |  |
-| [`referral_system`](#referral-system-referralv2error) | `ReferralV2Error` | 3 | 10–12 | ✅ |  |
-| [`reputation`](#reputation-reputationerror) | `ReputationError` | 8 | 1–8 | ✅ |  |
-| [`resource_minter`](#resource-minter-mintererror) | `MinterError` | 6 | 200–205 | ✅ |  |
+| [`recipes`](#recipes-recipeerror) | `RecipeError` | 1 | 1–1 | ✅ | ✅ |
+| [`recycling_crafter`](#recycling-crafter-recyclingerror) | `RecyclingError` | 5 | 1–5 | ✅ | ✅ |
+| [`reentrancy_guard`](#reentrancy-guard-reentrancyerror) | `ReentrancyError` | 1 | 1–1 | ✅ | ✅ |
+| [`referral_system`](#referral-system-referralerror) | `ReferralError` | 7 | 1–7 | ✅ | ✅ |
+| [`referral_system`](#referral-system-referralv2error) | `ReferralV2Error` | 3 | 10–12 | ✅ | ✅ |
+| [`reputation`](#reputation-reputationerror) | `ReputationError` | 8 | 1–8 | ✅ | ✅ |
+| [`resource_minter`](#resource-minter-mintererror) | `MinterError` | 6 | 200–205 | ✅ | ✅ |
+| [`resource_minter`](#resource-minter-harvesterror) | `HarvestError` | 7 | 1–7 | ✅ | ✅ |
 | [`revenue_attribution`](#revenue-attribution-attributionerror) | `AttributionError` | 1 | 1–1 | ✅ | ✅ |
-| [`rewards`](#rewards-rewarderror) | `RewardError` | 8 | 1–8 | ✅ |  |
-| [`seasons`](#seasons-seasonerror) | `SeasonError` | 7 | 1–7 | ✅ |  |
-| [`session_manager`](#session-manager-sessionerror) | `SessionError` | 4 | 1–4 | ✅ |  |
-| [`shared_lib`](#shared-lib-sharederror) | `SharedError` | 3 | 1–3 | ✅ |  |
-| [`ship_customization`](#ship-customization-skinerror) | `SkinError` | 13 | 1–13 | ✅ |  |
-| [`ship_nft`](#ship-nft-shiperror) | `ShipError` | 8 | 1–8 | ✅ |  |
-| [`ship_upgrade`](#ship-upgrade-shipupgradeerror) | `ShipUpgradeError` | 6 | 200–205 | ✅ |  |
+| [`rewards`](#rewards-rewarderror) | `RewardError` | 8 | 1–8 | ✅ | ✅ |
+| [`seasons`](#seasons-seasonerror) | `SeasonError` | 7 | 1–7 | ✅ | ✅ |
+| [`session_manager`](#session-manager-sessionerror) | `SessionError` | 4 | 1–4 | ✅ | ✅ |
+| [`shared_lib`](#shared-lib-sharederror) | `SharedError` | 3 | 1–3 | ✅ | ✅ |
+| [`ship_customization`](#ship-customization-skinerror) | `SkinError` | 13 | 1–13 | ✅ | ✅ |
+| [`ship_nft`](#ship-nft-shiperror) | `ShipError` | 8 | 1–8 | ✅ | ✅ |
+| [`ship_upgrade`](#ship-upgrade-shipupgradeerror) | `ShipUpgradeError` | 10 | 200–209 | ✅ | ✅ |
 | [`smart_alerts`](#smart-alerts-alerterror) | `AlertError` | 2 | 1–2 | ✅ | ✅ |
 | [`soul_binding`](#soul-binding-bindingerror) | `BindingError` | 3 | 1–3 | ⚠️ not built |  |
 | [`staking`](#staking-stakingerror) | `StakingError` | 15 | 1–15 | ⚠️ not built |  |
-| [`state_snapshot`](#state-snapshot-snapshoterror) | `SnapshotError` | 9 | 1–9 | ✅ |  |
-| [`storage_optim`](#storage-optim-storageerror) | `StorageError` | 6 | 1–6 | ✅ |  |
-| [`sustainability_metrics`](#sustainability-metrics-sustainabilityerror) | `SustainabilityError` | 3 | 1–3 | ✅ |  |
-| [`theme_customizer`](#theme-customizer-themeerror) | `ThemeError` | 3 | 1–3 | ✅ |  |
+| [`state_snapshot`](#state-snapshot-snapshoterror) | `SnapshotError` | 9 | 1–9 | ✅ | ✅ |
+| [`storage_optim`](#storage-optim-storageerror) | `StorageError` | 6 | 1–6 | ✅ | ✅ |
+| [`sustainability_metrics`](#sustainability-metrics-sustainabilityerror) | `SustainabilityError` | 3 | 1–3 | ✅ | ✅ |
+| [`theme_customizer`](#theme-customizer-themeerror) | `ThemeError` | 3 | 1–3 | ✅ | ✅ |
 | [`token_burning`](#token-burning-burningerror) | `BurningError` | 6 | 1–6 | ⚠️ not built |  |
 | [`tournament`](#tournament-tournamenterror) | `TournamentError` | 15 | 1–15 | ⚠️ not built |  |
-| [`trading`](#trading-ammerror) | `AmmError` | 9 | 100–108 | ✅ |  |
-| [`trading`](#trading-tradingerror) | `TradingError` | 6 | 1–6 | ✅ |  |
-| [`treasure_vault`](#treasure-vault-vaulterror) | `VaultError` | 6 | 1–6 | ✅ |  |
+| [`trading`](#trading-ammerror) | `AmmError` | 9 | 100–108 | ✅ | ✅ |
+| [`trading`](#trading-tradingerror) | `TradingError` | 6 | 1–6 | ✅ | ✅ |
+| [`treasure_vault`](#treasure-vault-vaulterror) | `VaultError` | 6 | 1–6 | ✅ | ✅ |
 | [`wallet_abstraction`](#wallet-abstraction-walleterror) | `WalletError` | 14 | 1–14 | ⚠️ not built |  |
-| [`wormhole_traveler`](#wormhole-traveler-wormholeerror) | `WormholeError` | 10 | 1–10 | ✅ |  |
-| [`yield_farming`](#yield-farming-farmerror) | `FarmError` | 7 | 1–7 | ✅ |  |
-| [`yield_forecast`](#yield-forecast-forecasterror) | `ForecastError` | 7 | 1–7 | ✅ |  |
+| [`wormhole_traveler`](#wormhole-traveler-wormholeerror) | `WormholeError` | 10 | 1–10 | ✅ | ✅ |
+| [`yield_farming`](#yield-farming-farmerror) | `FarmError` | 7 | 1–7 | ✅ | ✅ |
+| [`yield_forecast`](#yield-forecast-forecasterror) | `ForecastError` | 7 | 1–7 | ✅ | ✅ |
 
 ---
 
@@ -439,7 +439,7 @@ Source: [`src/access_control.rs`](../src/access_control.rs) · Implements `Stand
 <a id="achievement-engine-achievementerror"></a>
 ### `achievement_engine` — `AchievementError`
 
-Source: [`src/achievement_engine.rs`](../src/achievement_engine.rs)
+Source: [`src/achievement_engine.rs`](../src/achievement_engine.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -462,7 +462,7 @@ Source: [`src/achievements.rs`](../src/achievements.rs) · *Not currently declar
 <a id="alliance-manager-allianceerror"></a>
 ### `alliance_manager` — `AllianceError`
 
-Source: [`src/alliance_manager.rs`](../src/alliance_manager.rs)
+Source: [`src/alliance_manager.rs`](../src/alliance_manager.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -486,7 +486,7 @@ Source: [`src/analytics.rs`](../src/analytics.rs) · Implements `StandardContrac
 <a id="anomaly-classifier-anomalyerror"></a>
 ### `anomaly_classifier` — `AnomalyError`
 
-Source: [`src/anomaly_classifier.rs`](../src/anomaly_classifier.rs)
+Source: [`src/anomaly_classifier.rs`](../src/anomaly_classifier.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -497,7 +497,7 @@ Source: [`src/anomaly_classifier.rs`](../src/anomaly_classifier.rs)
 <a id="audio-seed-generator-audioerror"></a>
 ### `audio_seed_generator` — `AudioError`
 
-Source: [`src/audio_seed_generator.rs`](../src/audio_seed_generator.rs)
+Source: [`src/audio_seed_generator.rs`](../src/audio_seed_generator.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -509,7 +509,7 @@ Source: [`src/audio_seed_generator.rs`](../src/audio_seed_generator.rs)
 <a id="audit-logger-auditloggererror"></a>
 ### `audit_logger` — `AuditLoggerError`
 
-Source: [`src/audit_logger.rs`](../src/audit_logger.rs)
+Source: [`src/audit_logger.rs`](../src/audit_logger.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -545,7 +545,7 @@ Source: [`src/batch_processor.rs`](../src/batch_processor.rs) · Implements `Sta
 <a id="battle-pass-battlepasserror"></a>
 ### `battle_pass` — `BattlePassError`
 
-Source: [`src/battle_pass.rs`](../src/battle_pass.rs)
+Source: [`src/battle_pass.rs`](../src/battle_pass.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -560,7 +560,7 @@ Source: [`src/battle_pass.rs`](../src/battle_pass.rs)
 <a id="blueprint-factory-blueprinterror"></a>
 ### `blueprint_factory` — `BlueprintError`
 
-Source: [`src/blueprint_factory.rs`](../src/blueprint_factory.rs)
+Source: [`src/blueprint_factory.rs`](../src/blueprint_factory.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -587,7 +587,7 @@ Source: [`src/bot_detection.rs`](../src/bot_detection.rs) · *Not currently decl
 <a id="bounty-board-bountyerror"></a>
 ### `bounty_board` — `BountyError`
 
-Source: [`src/bounty_board.rs`](../src/bounty_board.rs)
+Source: [`src/bounty_board.rs`](../src/bounty_board.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -677,7 +677,7 @@ Source: [`src/bug_bounty_payout.rs`](../src/bug_bounty_payout.rs) · *Not curren
 <a id="cache-ttl-manager-cachettlerror"></a>
 ### `cache_ttl_manager` — `CacheTtlError`
 
-Source: [`src/cache_ttl_manager.rs`](../src/cache_ttl_manager.rs)
+Source: [`src/cache_ttl_manager.rs`](../src/cache_ttl_manager.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -709,7 +709,7 @@ Source: [`src/clan_wars.rs`](../src/clan_wars.rs) · *Not currently declared in 
 <a id="composability-examples-composabilityerror"></a>
 ### `composability_examples` — `ComposabilityError`
 
-Source: [`src/composability_examples.rs`](../src/composability_examples.rs)
+Source: [`src/composability_examples.rs`](../src/composability_examples.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -743,7 +743,7 @@ Source: [`src/config_updater.rs`](../src/config_updater.rs) · *Not currently de
 <a id="constellation-mapper-constellationerror"></a>
 ### `constellation_mapper` — `ConstellationError`
 
-Source: [`src/constellation_mapper.rs`](../src/constellation_mapper.rs)
+Source: [`src/constellation_mapper.rs`](../src/constellation_mapper.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -755,7 +755,7 @@ Source: [`src/constellation_mapper.rs`](../src/constellation_mapper.rs)
 <a id="content-tools-contenttoolserror"></a>
 ### `content_tools` — `ContentToolsError`
 
-Source: [`src/content_tools.rs`](../src/content_tools.rs)
+Source: [`src/content_tools.rs`](../src/content_tools.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -773,7 +773,7 @@ Source: [`src/content_tools.rs`](../src/content_tools.rs)
 <a id="contract-versioning-versioningerror"></a>
 ### `contract_versioning` — `VersioningError`
 
-Source: [`src/contract_versioning.rs`](../src/contract_versioning.rs)
+Source: [`src/contract_versioning.rs`](../src/contract_versioning.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -786,7 +786,7 @@ Source: [`src/contract_versioning.rs`](../src/contract_versioning.rs)
 <a id="crafting-craftingerror"></a>
 ### `crafting` — `CraftingError`
 
-Source: [`src/crafting.rs`](../src/crafting.rs)
+Source: [`src/crafting.rs`](../src/crafting.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -837,7 +837,7 @@ Source: [`src/dao.rs`](../src/dao.rs) · *Not currently declared in `src/lib.rs`
 <a id="data-exporter-exporterror"></a>
 ### `data_exporter` — `ExportError`
 
-Source: [`src/data_exporter.rs`](../src/data_exporter.rs)
+Source: [`src/data_exporter.rs`](../src/data_exporter.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -845,20 +845,10 @@ Source: [`src/data_exporter.rs`](../src/data_exporter.rs)
 | 2 | `NotOptedIn` | Not opted in | Authorization | The caller does not hold the required relationship, opt-in or eligibility. Sign with the right account or complete the prerequisite (opt in, verify profile, solve the CAPTCHA, buy premium). |
 | 3 | `ProfileNotFound` | Profile not found | NotFound | Check the ID/key. Create or register the entity first, or refresh cached client state. |
 
-<a id="dex-integration-harvesterror"></a>
-### `dex_integration` — `HarvestError`
-
-Source: [`src/dex_integration.rs`](../src/dex_integration.rs)
-
-| Code | Variant | Meaning | Category | How to handle |
-|-----:|---------|---------|----------|---------------|
-| 1 | `Deprecated` | Deprecated | State | The operation is not allowed in the current state or time window. Read the entity's state, wait for the delay or approval, or complete the prerequisite step. |
-| 2 | `DexFailure` | Dex failure | Internal | Unexpected contract or downstream failure. Record the tx hash and inputs, check contract events, and report it. Retry only if the downstream dependency is known to be transient. |
-
 <a id="difficulty-curve-curveerror"></a>
 ### `difficulty_curve` — `CurveError`
 
-Source: [`src/difficulty_curve.rs`](../src/difficulty_curve.rs)
+Source: [`src/difficulty_curve.rs`](../src/difficulty_curve.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -871,7 +861,7 @@ Source: [`src/difficulty_curve.rs`](../src/difficulty_curve.rs)
 <a id="difficulty-scaler-difficultyerror"></a>
 ### `difficulty_scaler` — `DifficultyError`
 
-Source: [`src/difficulty_scaler.rs`](../src/difficulty_scaler.rs)
+Source: [`src/difficulty_scaler.rs`](../src/difficulty_scaler.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -880,7 +870,7 @@ Source: [`src/difficulty_scaler.rs`](../src/difficulty_scaler.rs)
 <a id="emergency-controls-emergencyerror"></a>
 ### `emergency_controls` — `EmergencyError`
 
-Source: [`src/emergency_controls.rs`](../src/emergency_controls.rs)
+Source: [`src/emergency_controls.rs`](../src/emergency_controls.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -894,7 +884,7 @@ Source: [`src/emergency_controls.rs`](../src/emergency_controls.rs)
 <a id="energy-manager-energyerror"></a>
 ### `energy_manager` — `EnergyError`
 
-Source: [`src/energy_manager.rs`](../src/energy_manager.rs)
+Source: [`src/energy_manager.rs`](../src/energy_manager.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -907,7 +897,7 @@ Source: [`src/energy_manager.rs`](../src/energy_manager.rs)
 <a id="entanglement-comms-entanglementerror"></a>
 ### `entanglement_comms` — `EntanglementError`
 
-Source: [`src/entanglement_comms.rs`](../src/entanglement_comms.rs)
+Source: [`src/entanglement_comms.rs`](../src/entanglement_comms.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -921,7 +911,7 @@ Source: [`src/entanglement_comms.rs`](../src/entanglement_comms.rs)
 <a id="environment-simulator-environmenterror"></a>
 ### `environment_simulator` — `EnvironmentError`
 
-Source: [`src/environment_simulator.rs`](../src/environment_simulator.rs)
+Source: [`src/environment_simulator.rs`](../src/environment_simulator.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -995,7 +985,7 @@ Source: [`src/errors.rs`](../src/errors.rs) · *Not currently declared in `src/l
 <a id="escrow-trader-escrowerror"></a>
 ### `escrow_trader` — `EscrowError`
 
-Source: [`src/escrow_trader.rs`](../src/escrow_trader.rs)
+Source: [`src/escrow_trader.rs`](../src/escrow_trader.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1022,7 +1012,7 @@ Source: [`src/event_framework.rs`](../src/event_framework.rs) · *Not currently 
 <a id="event-scheduler-eventerror"></a>
 ### `event_scheduler` — `EventError`
 
-Source: [`src/event_scheduler.rs`](../src/event_scheduler.rs)
+Source: [`src/event_scheduler.rs`](../src/event_scheduler.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1040,6 +1030,16 @@ Source: [`src/event_scheduler.rs`](../src/event_scheduler.rs)
 | 12 | `ChallengeNotComplete` | Player has not yet completed the challenge. | State | The operation is not allowed in the current state or time window. Read the entity's state, wait for the delay or approval, or complete the prerequisite step. |
 | 13 | `TooManyChallenges` | Too many active challenges. | ResourceLimit | Reduce the amount or batch size, top up balances or pools, or wait for the limit window to reset. |
 | 14 | `RecurringNotDue` | Recurring event fired too recently; interval not yet elapsed. | State | The operation is not allowed in the current state or time window. Read the entity's state, wait for the delay or approval, or complete the prerequisite step. |
+| 15 | `ChallengeNotStarted` | Challenge window has not opened yet. | State | The entity is in the wrong state or time window. Read its current state, then wait or take the prerequisite step first. |
+| 16 | `InvalidEventWindow` | Event window is invalid or falls outside the current season. | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
+| 17 | `EventCooldownActive` | The event category is still cooling down from a previous event. | State | The entity is in the wrong state or time window. Read its current state, then wait or take the prerequisite step first. |
+| 18 | `ExclusiveEventConflict` | The window overlaps an exclusive event (or this exclusive event overlaps another). | Conflict | The action already happened. Treat it as idempotent: re-query state instead of retrying. |
+| 19 | `InvalidEventState` | The event is not in the state required for this operation. | State | The entity is in the wrong state or time window. Read its current state, then wait or take the prerequisite step first. |
+| 20 | `NoActiveSeason` | No season is running. | NotFound | Check the ID/key. Create or register the entity first, or refresh cached client state. |
+| 21 | `TooManySeasonalEvents` | Too many seasonal events scheduled or active. | ResourceLimit | Reduce the amount or batch size, top up balances or pools, or wait for the limit window to reset. |
+| 22 | `InvalidRewardPool` | Reward pool must be positive and must not overflow. | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
+| 23 | `NoEventReward` | Player has no reward for this event. | NotFound | Check the ID/key. Create or register the entity first, or refresh cached client state. |
+| 24 | `ClaimWindowClosed` | The reward claim window has closed. | State | The entity is in the wrong state or time window. Read its current state, then wait or take the prerequisite step first. |
 
 <a id="exploration-heatmap-heatmaperror"></a>
 ### `exploration_heatmap` — `HeatmapError`
@@ -1068,7 +1068,7 @@ Source: [`src/fleet_manager.rs`](../src/fleet_manager.rs) · *Not currently decl
 <a id="fractional-resources-fractionalerror"></a>
 ### `fractional_resources` — `FractionalError`
 
-Source: [`src/fractional_resources.rs`](../src/fractional_resources.rs)
+Source: [`src/fractional_resources.rs`](../src/fractional_resources.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1095,7 +1095,7 @@ Source: [`src/fraud_detection.rs`](../src/fraud_detection.rs) · Implements `Sta
 <a id="gas-recovery-refunderror"></a>
 ### `gas_recovery` — `RefundError`
 
-Source: [`src/gas_recovery.rs`](../src/gas_recovery.rs)
+Source: [`src/gas_recovery.rs`](../src/gas_recovery.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1108,7 +1108,7 @@ Source: [`src/gas_recovery.rs`](../src/gas_recovery.rs)
 <a id="gas-sponsor-sponsorerror"></a>
 ### `gas_sponsor` — `SponsorError`
 
-Source: [`src/gas_sponsor.rs`](../src/gas_sponsor.rs)
+Source: [`src/gas_sponsor.rs`](../src/gas_sponsor.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1128,7 +1128,7 @@ Source: [`src/gas_sponsor.rs`](../src/gas_sponsor.rs)
 <a id="gifting-system-gifterror"></a>
 ### `gifting_system` — `GiftError`
 
-Source: [`src/gifting_system.rs`](../src/gifting_system.rs)
+Source: [`src/gifting_system.rs`](../src/gifting_system.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1144,7 +1144,7 @@ Source: [`src/gifting_system.rs`](../src/gifting_system.rs)
 <a id="governance-goverror"></a>
 ### `governance` — `GovError`
 
-Source: [`src/governance.rs`](../src/governance.rs)
+Source: [`src/governance.rs`](../src/governance.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1175,7 +1175,7 @@ Source: [`src/guild_economy.rs`](../src/guild_economy.rs) · *Not currently decl
 <a id="guild-quests-guildquesterror"></a>
 ### `guild_quests` — `GuildQuestError`
 
-Source: [`src/guild_quests.rs`](../src/guild_quests.rs)
+Source: [`src/guild_quests.rs`](../src/guild_quests.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1188,7 +1188,7 @@ Source: [`src/guild_quests.rs`](../src/guild_quests.rs)
 <a id="health-monitor-healtherror"></a>
 ### `health_monitor` — `HealthError`
 
-Source: [`src/health_monitor.rs`](../src/health_monitor.rs)
+Source: [`src/health_monitor.rs`](../src/health_monitor.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1198,7 +1198,7 @@ Source: [`src/health_monitor.rs`](../src/health_monitor.rs)
 <a id="indexer-callbacks-indexererror"></a>
 ### `indexer_callbacks` — `IndexerError`
 
-Source: [`src/indexer_callbacks.rs`](../src/indexer_callbacks.rs)
+Source: [`src/indexer_callbacks.rs`](../src/indexer_callbacks.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1209,7 +1209,7 @@ Source: [`src/indexer_callbacks.rs`](../src/indexer_callbacks.rs)
 <a id="input-validation-validationerror"></a>
 ### `input_validation` — `ValidationError`
 
-Source: [`src/input_validation.rs`](../src/input_validation.rs)
+Source: [`src/input_validation.rs`](../src/input_validation.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1222,7 +1222,7 @@ Source: [`src/input_validation.rs`](../src/input_validation.rs)
 <a id="leaderboards-leaderboarderror"></a>
 ### `leaderboards` — `LeaderboardError`
 
-Source: [`src/leaderboards.rs`](../src/leaderboards.rs)
+Source: [`src/leaderboards.rs`](../src/leaderboards.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1255,7 +1255,7 @@ Source: [`src/loot_system.rs`](../src/loot_system.rs) · *Not currently declared
 <a id="market-oracle-oracleerror"></a>
 ### `market_oracle` — `OracleError`
 
-Source: [`src/market_oracle.rs`](../src/market_oracle.rs)
+Source: [`src/market_oracle.rs`](../src/market_oracle.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1271,7 +1271,7 @@ Source: [`src/market_oracle.rs`](../src/market_oracle.rs)
 <a id="metadata-resolver-metadataerror"></a>
 ### `metadata_resolver` — `MetadataError`
 
-Source: [`src/metadata_resolver.rs`](../src/metadata_resolver.rs)
+Source: [`src/metadata_resolver.rs`](../src/metadata_resolver.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1284,7 +1284,7 @@ Source: [`src/metadata_resolver.rs`](../src/metadata_resolver.rs)
 <a id="metrics-exporter-metricserror"></a>
 ### `metrics_exporter` — `MetricsError`
 
-Source: [`src/metrics_exporter.rs`](../src/metrics_exporter.rs)
+Source: [`src/metrics_exporter.rs`](../src/metrics_exporter.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1295,7 +1295,7 @@ Source: [`src/metrics_exporter.rs`](../src/metrics_exporter.rs)
 <a id="migration-framework-migrationerror"></a>
 ### `migration_framework` — `MigrationError`
 
-Source: [`src/migration_framework.rs`](../src/migration_framework.rs)
+Source: [`src/migration_framework.rs`](../src/migration_framework.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1328,7 +1328,7 @@ Source: [`src/mini_games.rs`](../src/mini_games.rs) · *Not currently declared i
 <a id="mission-generator-missionerror"></a>
 ### `mission_generator` — `MissionError`
 
-Source: [`src/mission_generator.rs`](../src/mission_generator.rs)
+Source: [`src/mission_generator.rs`](../src/mission_generator.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1341,7 +1341,7 @@ Source: [`src/mission_generator.rs`](../src/mission_generator.rs)
 <a id="mobile-views-mobileviewerror"></a>
 ### `mobile_views` — `MobileViewError`
 
-Source: [`src/mobile_views.rs`](../src/mobile_views.rs)
+Source: [`src/mobile_views.rs`](../src/mobile_views.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1350,7 +1350,7 @@ Source: [`src/mobile_views.rs`](../src/mobile_views.rs)
 <a id="navigation-planner-naverror"></a>
 ### `navigation_planner` — `NavError`
 
-Source: [`src/navigation_planner.rs`](../src/navigation_planner.rs)
+Source: [`src/navigation_planner.rs`](../src/navigation_planner.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1376,7 +1376,7 @@ Source: [`src/nebula_archive.rs`](../src/nebula_archive.rs) · *Not currently de
 <a id="nebula-gen-nebulaerror"></a>
 ### `nebula_gen` — `NebulaError`
 
-Source: [`src/nebula_gen.rs`](../src/nebula_gen.rs)
+Source: [`src/nebula_gen.rs`](../src/nebula_gen.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1390,11 +1390,12 @@ Source: [`src/nebula_gen.rs`](../src/nebula_gen.rs)
 | 8 | `InvalidShipId` | ship_id must be greater than zero. | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
 | 9 | `InvalidRegionId` | region_id must be between 1 and MAX_REGION_ID (inclusive). | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
 | 10 | `AnomalyOutOfBounds` | Anomaly index is out of bounds for this layout. | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
+| 11 | `RateLimitExceeded` | Caller exceeded the layout-generation rate limit (DoS prevention). | ResourceLimit | Reduce the amount or batch size, top up balances or pools, or wait for the limit window to reset. |
 
 <a id="nft-marketplace-marketplaceerror"></a>
 ### `nft_marketplace` — `MarketplaceError`
 
-Source: [`src/nft_marketplace.rs`](../src/nft_marketplace.rs)
+Source: [`src/nft_marketplace.rs`](../src/nft_marketplace.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1416,7 +1417,7 @@ Source: [`src/nft_marketplace.rs`](../src/nft_marketplace.rs)
 <a id="nomad-bonding-bonderror"></a>
 ### `nomad_bonding` — `BondError`
 
-Source: [`src/nomad_bonding.rs`](../src/nomad_bonding.rs)
+Source: [`src/nomad_bonding.rs`](../src/nomad_bonding.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1447,7 +1448,7 @@ Source: [`src/offline_progress.rs`](../src/offline_progress.rs) · *Not currentl
 <a id="onboarding-tutorial-onboardingerror"></a>
 ### `onboarding_tutorial` — `OnboardingError`
 
-Source: [`src/onboarding_tutorial.rs`](../src/onboarding_tutorial.rs)
+Source: [`src/onboarding_tutorial.rs`](../src/onboarding_tutorial.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1466,7 +1467,7 @@ Source: [`src/onboarding_tutorial.rs`](../src/onboarding_tutorial.rs)
 <a id="player-profile-profileerror"></a>
 ### `player_profile` — `ProfileError`
 
-Source: [`src/player_profile.rs`](../src/player_profile.rs)
+Source: [`src/player_profile.rs`](../src/player_profile.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1489,7 +1490,7 @@ Source: [`src/player_segmentation.rs`](../src/player_segmentation.rs) · Impleme
 <a id="portal-registry-portalerror"></a>
 ### `portal_registry` — `PortalError`
 
-Source: [`src/portal_registry.rs`](../src/portal_registry.rs)
+Source: [`src/portal_registry.rs`](../src/portal_registry.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1502,7 +1503,7 @@ Source: [`src/portal_registry.rs`](../src/portal_registry.rs)
 <a id="privacy-stats-privacyerror"></a>
 ### `privacy_stats` — `PrivacyError`
 
-Source: [`src/privacy_stats.rs`](../src/privacy_stats.rs)
+Source: [`src/privacy_stats.rs`](../src/privacy_stats.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1515,7 +1516,7 @@ Source: [`src/privacy_stats.rs`](../src/privacy_stats.rs)
 <a id="prize-distributor-prizeerror"></a>
 ### `prize_distributor` — `PrizeError`
 
-Source: [`src/prize_distributor.rs`](../src/prize_distributor.rs)
+Source: [`src/prize_distributor.rs`](../src/prize_distributor.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1543,7 +1544,7 @@ Source: [`src/proxy.rs`](../src/proxy.rs) · *Not currently declared in `src/lib
 <a id="pvp-combat-pvperror"></a>
 ### `pvp_combat` — `PvPError`
 
-Source: [`src/pvp_combat.rs`](../src/pvp_combat.rs)
+Source: [`src/pvp_combat.rs`](../src/pvp_combat.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1564,7 +1565,7 @@ Source: [`src/pvp_combat.rs`](../src/pvp_combat.rs)
 <a id="quest-system-questerror"></a>
 ### `quest_system` — `QuestError`
 
-Source: [`src/quest_system.rs`](../src/quest_system.rs)
+Source: [`src/quest_system.rs`](../src/quest_system.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1588,7 +1589,7 @@ Source: [`src/quest_system.rs`](../src/quest_system.rs)
 <a id="randomness-oracle-oracleerror"></a>
 ### `randomness_oracle` — `OracleError`
 
-Source: [`src/randomness_oracle.rs`](../src/randomness_oracle.rs)
+Source: [`src/randomness_oracle.rs`](../src/randomness_oracle.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1598,12 +1599,13 @@ Source: [`src/randomness_oracle.rs`](../src/randomness_oracle.rs)
 <a id="rate-limiter-ratelimiterror"></a>
 ### `rate_limiter` — `RateLimitError`
 
-Source: [`src/rate_limiter.rs`](../src/rate_limiter.rs)
+Source: [`src/rate_limiter.rs`](../src/rate_limiter.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
 | 100 | `RateLimitExceeded` | Caller has exceeded the allowed call rate for this operation. | ResourceLimit | Reduce the amount or batch size, top up balances or pools, or wait for the limit window to reset. |
 | 101 | `Unauthorized` | Only the contract admin may update rate limit configuration. | Authorization | Sign with the account that holds the required role or ownership; check role grants. |
+| 102 | `InvalidConfig` | `max_calls` and `window_seconds` must both be non-zero. | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
 
 <a id="realtime-events-realtimeerror"></a>
 ### `realtime_events` — `RealtimeError`
@@ -1629,7 +1631,7 @@ Source: [`src/realtime_events.rs`](../src/realtime_events.rs) · *Not currently 
 <a id="recipes-recipeerror"></a>
 ### `recipes` — `RecipeError`
 
-Source: [`src/recipes.rs`](../src/recipes.rs)
+Source: [`src/recipes.rs`](../src/recipes.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1638,7 +1640,7 @@ Source: [`src/recipes.rs`](../src/recipes.rs)
 <a id="recycling-crafter-recyclingerror"></a>
 ### `recycling_crafter` — `RecyclingError`
 
-Source: [`src/recycling_crafter.rs`](../src/recycling_crafter.rs)
+Source: [`src/recycling_crafter.rs`](../src/recycling_crafter.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1651,7 +1653,7 @@ Source: [`src/recycling_crafter.rs`](../src/recycling_crafter.rs)
 <a id="reentrancy-guard-reentrancyerror"></a>
 ### `reentrancy_guard` — `ReentrancyError`
 
-Source: [`src/reentrancy_guard.rs`](../src/reentrancy_guard.rs)
+Source: [`src/reentrancy_guard.rs`](../src/reentrancy_guard.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1660,7 +1662,7 @@ Source: [`src/reentrancy_guard.rs`](../src/reentrancy_guard.rs)
 <a id="referral-system-referralerror"></a>
 ### `referral_system` — `ReferralError`
 
-Source: [`src/referral_system.rs`](../src/referral_system.rs)
+Source: [`src/referral_system.rs`](../src/referral_system.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1675,7 +1677,7 @@ Source: [`src/referral_system.rs`](../src/referral_system.rs)
 <a id="referral-system-referralv2error"></a>
 ### `referral_system` — `ReferralV2Error`
 
-Source: [`src/referral_system.rs`](../src/referral_system.rs)
+Source: [`src/referral_system.rs`](../src/referral_system.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1686,7 +1688,7 @@ Source: [`src/referral_system.rs`](../src/referral_system.rs)
 <a id="reputation-reputationerror"></a>
 ### `reputation` — `ReputationError`
 
-Source: [`src/reputation.rs`](../src/reputation.rs)
+Source: [`src/reputation.rs`](../src/reputation.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1702,7 +1704,7 @@ Source: [`src/reputation.rs`](../src/reputation.rs)
 <a id="resource-minter-mintererror"></a>
 ### `resource_minter` — `MinterError`
 
-Source: [`src/resource_minter.rs`](../src/resource_minter.rs)
+Source: [`src/resource_minter.rs`](../src/resource_minter.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1712,6 +1714,21 @@ Source: [`src/resource_minter.rs`](../src/resource_minter.rs)
 | 203 | `NoResourceAtAnomaly` | The specified anomaly index does not contain a resource. | NotFound | Nothing is available for this request yet. Check the preconditions or wait for new state; no need to retry immediately. |
 | 204 | `ArithmeticOverflow` | A checked arithmetic operation overflowed (Issue #239). | ResourceLimit | Reduce the amount or batch size, top up balances or pools, or wait for the limit window to reset. |
 | 205 | `InsufficientBalance` | The account holds less than the requested debit amount (Issue #281). | ResourceLimit | Reduce the amount or batch size, top up balances or pools, or wait for the limit window to reset. |
+
+<a id="resource-minter-harvesterror"></a>
+### `resource_minter` — `HarvestError`
+
+Source: [`src/resource_minter.rs`](../src/resource_minter.rs) · Implements `StandardContractError`. Re-exported by `dex_integration`.
+
+| Code | Variant | Meaning | Category | How to handle |
+|-----:|---------|---------|----------|---------------|
+| 1 | `ShipNotFound` | No ship with the given ID exists. | NotFound | Check the ID/key. Create or register the entity first, or refresh cached client state. |
+| 2 | `EmptyHarvest` | The layout yielded no resources (all cells empty or non-resource). | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
+| 3 | `InvalidPrice` | `min_price` was zero or negative. | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
+| 4 | `AssetNotHarvested` | The requested asset was not present in this harvest. | NotFound | Check the ID/key. Create or register the entity first, or refresh cached client state. |
+| 5 | `PriceOverflow` | A checked arithmetic operation overflowed (Issue #239). | Internal | Unexpected contract or downstream failure. Record the tx hash and inputs, check contract events, and report it. Retry only if the downstream dependency is known to be transient. |
+| 6 | `DexFailure` | Generic DEX failure: unknown offer, already cancelled, or rate-limited. | Internal | Unexpected contract or downstream failure. Record the tx hash and inputs, check contract events, and report it. Retry only if the downstream dependency is known to be transient. |
+| 7 | `InsufficientBalance` | Seller does not hold enough of `resource` to cover the listing. | ResourceLimit | Reduce the amount or batch size, top up balances or pools, or wait for the limit window to reset. |
 
 <a id="revenue-attribution-attributionerror"></a>
 ### `revenue_attribution` — `AttributionError`
@@ -1725,7 +1742,7 @@ Source: [`src/revenue_attribution.rs`](../src/revenue_attribution.rs) · Impleme
 <a id="rewards-rewarderror"></a>
 ### `rewards` — `RewardError`
 
-Source: [`src/rewards.rs`](../src/rewards.rs)
+Source: [`src/rewards.rs`](../src/rewards.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1741,7 +1758,7 @@ Source: [`src/rewards.rs`](../src/rewards.rs)
 <a id="seasons-seasonerror"></a>
 ### `seasons` — `SeasonError`
 
-Source: [`src/seasons.rs`](../src/seasons.rs)
+Source: [`src/seasons.rs`](../src/seasons.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1756,7 +1773,7 @@ Source: [`src/seasons.rs`](../src/seasons.rs)
 <a id="session-manager-sessionerror"></a>
 ### `session_manager` — `SessionError`
 
-Source: [`src/session_manager.rs`](../src/session_manager.rs)
+Source: [`src/session_manager.rs`](../src/session_manager.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1768,7 +1785,7 @@ Source: [`src/session_manager.rs`](../src/session_manager.rs)
 <a id="shared-lib-sharederror"></a>
 ### `shared_lib` — `SharedError`
 
-Source: [`src/shared_lib.rs`](../src/shared_lib.rs)
+Source: [`src/shared_lib.rs`](../src/shared_lib.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1779,7 +1796,7 @@ Source: [`src/shared_lib.rs`](../src/shared_lib.rs)
 <a id="ship-customization-skinerror"></a>
 ### `ship_customization` — `SkinError`
 
-Source: [`src/ship_customization.rs`](../src/ship_customization.rs)
+Source: [`src/ship_customization.rs`](../src/ship_customization.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1800,7 +1817,7 @@ Source: [`src/ship_customization.rs`](../src/ship_customization.rs)
 <a id="ship-nft-shiperror"></a>
 ### `ship_nft` — `ShipError`
 
-Source: [`src/ship_nft.rs`](../src/ship_nft.rs)
+Source: [`src/ship_nft.rs`](../src/ship_nft.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1816,7 +1833,7 @@ Source: [`src/ship_nft.rs`](../src/ship_nft.rs)
 <a id="ship-upgrade-shipupgradeerror"></a>
 ### `ship_upgrade` — `ShipUpgradeError`
 
-Source: [`src/ship_upgrade.rs`](../src/ship_upgrade.rs)
+Source: [`src/ship_upgrade.rs`](../src/ship_upgrade.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1826,6 +1843,10 @@ Source: [`src/ship_upgrade.rs`](../src/ship_upgrade.rs)
 | 203 | `UnknownComponent` | Unknown component | NotFound | Check the ID/key. Create or register the entity first, or refresh cached client state. |
 | 204 | `InvariantViolation` | Invariant violated: module cap or mass limit exceeded. | Internal | Unexpected contract or downstream failure. Record the tx hash and inputs, check contract events, and report it. Retry only if the downstream dependency is known to be transient. |
 | 205 | `BatchTooLarge` | Batch too large | ResourceLimit | Reduce the amount or batch size, top up balances or pools, or wait for the limit window to reset. |
+| 206 | `InvalidShipId` | Ship ID must be greater than zero. | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
+| 207 | `EmptyBatch` | A batch must contain at least one component. | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
+| 208 | `InvalidBlueprint` | The blueprint map must contain at least one component. | Validation | Fix the arguments: check ranges, non-zero values, lengths and IDs before sending. |
+| 209 | `RateLimitExceeded` | Caller exceeded the ship-upgrade rate limit (DoS prevention). | ResourceLimit | Reduce the amount or batch size, top up balances or pools, or wait for the limit window to reset. |
 
 <a id="smart-alerts-alerterror"></a>
 ### `smart_alerts` — `AlertError`
@@ -1874,7 +1895,7 @@ Source: [`src/staking.rs`](../src/staking.rs) · *Not currently declared in `src
 <a id="state-snapshot-snapshoterror"></a>
 ### `state_snapshot` — `SnapshotError`
 
-Source: [`src/state_snapshot.rs`](../src/state_snapshot.rs)
+Source: [`src/state_snapshot.rs`](../src/state_snapshot.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1891,7 +1912,7 @@ Source: [`src/state_snapshot.rs`](../src/state_snapshot.rs)
 <a id="storage-optim-storageerror"></a>
 ### `storage_optim` — `StorageError`
 
-Source: [`src/storage_optim.rs`](../src/storage_optim.rs)
+Source: [`src/storage_optim.rs`](../src/storage_optim.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1905,7 +1926,7 @@ Source: [`src/storage_optim.rs`](../src/storage_optim.rs)
 <a id="sustainability-metrics-sustainabilityerror"></a>
 ### `sustainability_metrics` — `SustainabilityError`
 
-Source: [`src/sustainability_metrics.rs`](../src/sustainability_metrics.rs)
+Source: [`src/sustainability_metrics.rs`](../src/sustainability_metrics.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1916,7 +1937,7 @@ Source: [`src/sustainability_metrics.rs`](../src/sustainability_metrics.rs)
 <a id="theme-customizer-themeerror"></a>
 ### `theme_customizer` — `ThemeError`
 
-Source: [`src/theme_customizer.rs`](../src/theme_customizer.rs)
+Source: [`src/theme_customizer.rs`](../src/theme_customizer.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1964,7 +1985,7 @@ Source: [`src/tournament.rs`](../src/tournament.rs) · *Not currently declared i
 <a id="trading-ammerror"></a>
 ### `trading` — `AmmError`
 
-Source: [`src/trading.rs`](../src/trading.rs)
+Source: [`src/trading.rs`](../src/trading.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1981,7 +2002,7 @@ Source: [`src/trading.rs`](../src/trading.rs)
 <a id="trading-tradingerror"></a>
 ### `trading` — `TradingError`
 
-Source: [`src/trading.rs`](../src/trading.rs)
+Source: [`src/trading.rs`](../src/trading.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -1995,7 +2016,7 @@ Source: [`src/trading.rs`](../src/trading.rs)
 <a id="treasure-vault-vaulterror"></a>
 ### `treasure_vault` — `VaultError`
 
-Source: [`src/treasure_vault.rs`](../src/treasure_vault.rs)
+Source: [`src/treasure_vault.rs`](../src/treasure_vault.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -2031,7 +2052,7 @@ Source: [`src/wallet_abstraction.rs`](../src/wallet_abstraction.rs) · *Not curr
 <a id="wormhole-traveler-wormholeerror"></a>
 ### `wormhole_traveler` — `WormholeError`
 
-Source: [`src/wormhole_traveler.rs`](../src/wormhole_traveler.rs)
+Source: [`src/wormhole_traveler.rs`](../src/wormhole_traveler.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -2049,7 +2070,7 @@ Source: [`src/wormhole_traveler.rs`](../src/wormhole_traveler.rs)
 <a id="yield-farming-farmerror"></a>
 ### `yield_farming` — `FarmError`
 
-Source: [`src/yield_farming.rs`](../src/yield_farming.rs)
+Source: [`src/yield_farming.rs`](../src/yield_farming.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|
@@ -2064,7 +2085,7 @@ Source: [`src/yield_farming.rs`](../src/yield_farming.rs)
 <a id="yield-forecast-forecasterror"></a>
 ### `yield_forecast` — `ForecastError`
 
-Source: [`src/yield_forecast.rs`](../src/yield_forecast.rs)
+Source: [`src/yield_forecast.rs`](../src/yield_forecast.rs) · Implements `StandardContractError`.
 
 | Code | Variant | Meaning | Category | How to handle |
 |-----:|---------|---------|----------|---------------|

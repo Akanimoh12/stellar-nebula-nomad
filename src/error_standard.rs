@@ -59,4 +59,35 @@ mod tests {
         assert_eq!(descriptor.kind, ErrorKind::ResourceLimit);
         assert!(descriptor.retryable);
     }
+
+    #[test]
+    fn rate_limit_errors_are_retryable_resource_limits() {
+        use crate::{
+            nebula_gen::NebulaError, rate_limiter::RateLimitError, ship_upgrade::ShipUpgradeError,
+        };
+
+        for descriptor in [
+            NebulaError::RateLimitExceeded.descriptor(),
+            RateLimitError::RateLimitExceeded.descriptor(),
+            ShipUpgradeError::RateLimitExceeded.descriptor(),
+        ] {
+            assert_eq!(descriptor.kind, ErrorKind::ResourceLimit);
+            assert!(descriptor.retryable);
+        }
+    }
+
+    #[test]
+    fn descriptors_preserve_abi_codes_and_module_namespace() {
+        use crate::{migration_framework::MigrationError, ship_upgrade::ShipUpgradeError};
+
+        let invalid_ship = ShipUpgradeError::InvalidShipId.descriptor();
+        assert_eq!(invalid_ship.module, "ship_upgrade");
+        assert_eq!(invalid_ship.code, 206);
+        assert_eq!(invalid_ship.kind, ErrorKind::Validation);
+
+        let unauthorized = MigrationError::Unauthorized.descriptor();
+        assert_eq!(unauthorized.module, "migration_framework");
+        assert_eq!(unauthorized.kind, ErrorKind::Authorization);
+        assert!(!unauthorized.retryable);
+    }
 }

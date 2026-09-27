@@ -53,6 +53,25 @@ pub enum StorageError {
     InvalidKey = 6,
 }
 
+impl crate::error_standard::StandardContractError for StorageError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ReentrancyDetected => (ErrorKind::Conflict, false),
+            Self::EntryNotFound => (ErrorKind::NotFound, false),
+            Self::BurstLimitExceeded => (ErrorKind::ResourceLimit, true),
+            Self::InvalidTtl | Self::InvalidKey => (ErrorKind::Validation, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "storage_optim",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Data Types ───────────────────────────────────────────────────────────
 
 /// Packed storage entry with TTL metadata for gas-efficient reads.

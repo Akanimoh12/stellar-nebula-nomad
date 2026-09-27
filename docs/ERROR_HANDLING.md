@@ -33,5 +33,7 @@ release.
 6. Test its descriptor and the contract behavior that emits it.
 7. Add the new code to the module's table in [ERROR_CODES.md](ERROR_CODES.md).
 
-The access-control, analytics, and batch-processing modules are the reference
-implementations. Other modules can migrate incrementally without ABI changes.
+Every error enum in a module compiled into the contract implements
+`StandardContractError`; access-control, analytics, and batch-processing are the
+reference implementations. Modules not yet declared in `src/lib.rs` (marked ⚠️ in
+[ERROR_CODES.md](ERROR_CODES.md)) should add the impl when they are wired in.

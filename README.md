@@ -115,6 +115,19 @@ cargo build
 cargo test
 ```
 
+### Docker (local full stack)
+
+Stellar Quickstart, contract hot-reload, Prometheus, and Grafana:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+Horizon is at http://localhost:8000, Grafana at http://localhost:3000. Details: [docs/DEV_ENVIRONMENT.md](docs/DEV_ENVIRONMENT.md).
+
+Daily Horizon backups: `./scripts/backup.sh` (see [infrastructure/backup/README.md](infrastructure/backup/README.md)).
+
+
 ### Local Testing
 
 ```bash

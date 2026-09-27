@@ -15,6 +15,22 @@ pub enum HealthError {
     EmptyMetricBatch = 2,
 }
 
+impl crate::error_standard::StandardContractError for HealthError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::MetricBurstExceeded => (ErrorKind::ResourceLimit, true),
+            Self::EmptyMetricBatch => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "health_monitor",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 #[contracttype]
 pub struct HealthMetricInput {

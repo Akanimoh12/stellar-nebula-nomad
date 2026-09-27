@@ -45,6 +45,26 @@ pub enum PrizeError {
     InvalidRank = 6,
 }
 
+impl crate::error_standard::StandardContractError for PrizeError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InsufficientPrizePool | Self::TooManyPositions => {
+                (ErrorKind::ResourceLimit, false)
+            }
+            Self::NotAuthorized => (ErrorKind::Authorization, false),
+            Self::NoSnapshot => (ErrorKind::NotFound, false),
+            Self::InvalidAmount | Self::InvalidRank => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "prize_distributor",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Data Types ─────────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, PartialEq)]

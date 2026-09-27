@@ -82,6 +82,21 @@ pub enum MobileViewError {
     ShipNotFound = 1,
 }
 
+impl crate::error_standard::StandardContractError for MobileViewError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ShipNotFound => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "mobile_views",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 /// Map a scanner-power value to a rarity index (0 = Common … 4 = Legendary).

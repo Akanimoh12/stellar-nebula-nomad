@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, Env, String, Symbol};
+use soroban_sdk::{contracterror, Env, String};
 
 /// Maximum length for short string fields (names, aliases).
 pub const MAX_NAME_LENGTH: u32 = 64;
@@ -21,6 +21,25 @@ pub enum ValidationError {
     InvalidCharacters = 83,
     /// IPFS CID format is invalid.
     InvalidCidFormat = 84,
+}
+
+impl crate::error_standard::StandardContractError for ValidationError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::StringTooLong => (ErrorKind::ResourceLimit, false),
+            Self::EmptyString
+            | Self::InvalidUtf8
+            | Self::InvalidCharacters
+            | Self::InvalidCidFormat => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "input_validation",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 /// Check whether a byte is a control character (0x00-0x1F or 0x7F).
@@ -47,9 +66,19 @@ pub fn validate_string(
         return Err(ValidationError::StringTooLong);
     }
 
-    // Control character validation is done at the byte level
-    // during string construction; Soroban strings are guaranteed
-    // valid UTF-8, so we only check length constraints here.
+    // Reject control characters (0x00-0x1F, 0x7F) byte by byte. The length
+    // check above bounds `len`, but callers may pass a larger `max_length`
+    // than the scan buffer, so guard the buffer explicitly.
+    let len = value.len() as usize;
+    if len > MAX_DESCRIPTION_LENGTH as usize {
+        return Err(ValidationError::StringTooLong);
+    }
+    let mut buf = [0u8; MAX_DESCRIPTION_LENGTH as usize];
+    let bytes = &mut buf[..len];
+    value.copy_into_slice(bytes);
+    if bytes.iter().any(|b| is_control_char(*b)) {
+        return Err(ValidationError::InvalidCharacters);
+    }
 
     Ok(())
 }
@@ -145,6 +174,34 @@ mod tests {
         let env = make_env();
         let name = String::from_str(&env, "Test\x01Name");
         assert_eq!(validate_name(&env, &name), Err(ValidationError::InvalidCharacters));
+    }
+
+    #[test]
+    fn test_null_byte_rejected() {
+        let env = make_env();
+        let name = String::from_str(&env, "Test\0Name");
+        assert_eq!(validate_name(&env, &name), Err(ValidationError::InvalidCharacters));
+    }
+
+    #[test]
+    fn test_del_char_rejected() {
+        let env = make_env();
+        let name = String::from_str(&env, "Test\x7fName");
+        assert_eq!(validate_name(&env, &name), Err(ValidationError::InvalidCharacters));
+    }
+
+    #[test]
+    fn test_description_at_max_length_ok() {
+        let env = make_env();
+        let desc = String::from_str(&env, &"A".repeat(512));
+        assert_eq!(validate_description(&env, &desc), Ok(()));
+    }
+
+    #[test]
+    fn test_description_over_max_length_rejected() {
+        let env = make_env();
+        let desc = String::from_str(&env, &"A".repeat(513));
+        assert_eq!(validate_description(&env, &desc), Err(ValidationError::StringTooLong));
     }
 
     #[test]

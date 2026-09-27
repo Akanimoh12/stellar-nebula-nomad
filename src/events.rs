@@ -1,4 +1,4 @@
-use soroban_sdk::{symbol_short, Address, Env, Symbol};
+use soroban_sdk::{symbol_short, Env, Symbol};
 
 // ── PvP Combat ───────────────────────────────────────────────────────────────
 pub fn topic_pvp_admin_set() -> Symbol {

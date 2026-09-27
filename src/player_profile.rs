@@ -1,6 +1,5 @@
 use soroban_sdk::{contracttype, contracterror, symbol_short, Address, Env, Vec};
 
-use crate::input_validation;
 
 /// Maximum number of stat updates allowed in a single batch transaction.
 pub const MAX_BATCH_SIZE: u32 = 5;
@@ -35,7 +34,7 @@ pub struct PlayerProfile {
     pub created_at: u64,
     pub last_updated: u64,
     /// Consecutive daily-login days (Issue #280). Authoritative streak value —
-    /// [`crate::daily_rewards`] owns the calendar, the profile owns the streak.
+    /// `daily_rewards` owns the calendar, the profile owns the streak.
     pub login_streak: u32,
     /// Best login streak ever achieved.
     pub longest_login_streak: u32,
@@ -63,6 +62,24 @@ pub enum ProfileError {
     BatchTooLarge = 4,
     /// A balance-modifying operation would have wrapped.
     ArithmeticOverflow = 5,
+}
+
+impl crate::error_standard::StandardContractError for ProfileError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::ProfileNotFound => (ErrorKind::NotFound, false),
+            Self::ProfileAlreadyExists => (ErrorKind::Conflict, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::BatchTooLarge | Self::ArithmeticOverflow => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "player_profile",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 // ─── Functions ────────────────────────────────────────────────────────────────

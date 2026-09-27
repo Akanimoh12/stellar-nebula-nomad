@@ -22,6 +22,22 @@ pub enum OracleError {
     FallbackDepleted = 2,
 }
 
+impl crate::error_standard::StandardContractError for OracleError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::SeedInvalid => (ErrorKind::Validation, false),
+            Self::FallbackDepleted => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "randomness_oracle",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 /// Generate a hybrid random seed by combining ledger sequence, timestamp,
 /// and network ID via SHA-256.
 ///

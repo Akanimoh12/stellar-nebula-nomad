@@ -4,7 +4,9 @@ use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
 use soroban_sdk::{symbol_short, Address, Env, Map};
 use stellar_nebula_nomad::{
     NebulaNomadContract, NebulaNomadContractClient, ShipUpgradeError, UpgradeBlueprint,
+    UpgradeEconomy, DEFAULT_GROWTH_BPS, DEFAULT_MAX_COST, scaled_upgrade_cost,
 };
+use stellar_nebula_nomad::rate_limiter::{Operation, RateLimitConfig, RateLimitError};
 use stellar_nebula_nomad::ship_upgrade::{MAX_BATCH_UPGRADES, MAX_MODULES, MAX_MASS};
 
 fn setup() -> (Env, NebulaNomadContractClient<'static>, Address) {
@@ -36,6 +38,7 @@ fn make_blueprints(env: &Env) -> Map<soroban_sdk::Symbol, UpgradeBlueprint> {
             mass:          10,
             scanner_bonus: 5,
             hull_bonus:    0,
+            regen_bonus:   0,
         },
     );
     blueprints.set(
@@ -46,6 +49,7 @@ fn make_blueprints(env: &Env) -> Map<soroban_sdk::Symbol, UpgradeBlueprint> {
             mass:          20,
             scanner_bonus: 0,
             hull_bonus:    15,
+            regen_bonus:   0,
         },
     );
     blueprints
@@ -79,6 +83,15 @@ fn credit_resource(
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
+
+/// Total dust needed to install `count` scanner modules under the active
+/// rebalanced curve (Issue #454), so tests fund the real price rather than the
+/// retired flat 100-per-module schedule.
+fn budget_for_scanners(count: u32) -> u32 {
+    (0..count)
+        .map(|tier| scaled_upgrade_cost(100, tier, DEFAULT_GROWTH_BPS, DEFAULT_MAX_COST))
+        .sum()
+}
 
 #[test]
 fn test_init_upgrade_config_succeeds() {
@@ -160,9 +173,24 @@ fn test_invariant_module_cap_enforced() {
     let (env, client, admin) = setup();
     client.init_upgrade_config(&admin, &make_blueprints(&env));
 
+    // Raise the ship-upgrade rate limit so the module cap is what stops the last install.
+    client.init_rbac(&admin);
+    client.set_rate_limit_config(
+        &admin,
+        &Operation::ShipUpgrade,
+        &RateLimitConfig { max_calls: MAX_MODULES + 1, window_seconds: 300 },
+    );
+
     let player = Address::generate(&env);
-    // Fund enough for MAX_MODULES + 1 installs (each costs 100 dust, mass 10).
-    credit_resource(&env, &client.address, &player, symbol_short!("dust"), 100 * (MAX_MODULES + 1));
+    // Fund MAX_MODULES + 1 installs at their *scaled* prices so the module
+    // cap — not the balance — is what rejects the last install.
+    credit_resource(
+        &env,
+        &client.address,
+        &player,
+        symbol_short!("dust"),
+        budget_for_scanners(MAX_MODULES + 1),
+    );
 
     for _ in 0..MAX_MODULES {
         client.apply_upgrade(&player, &5u64, &symbol_short!("scanner"));
@@ -188,6 +216,7 @@ fn test_invariant_mass_cap_enforced() {
             mass:          60,
             scanner_bonus: 0,
             hull_bonus:    5,
+            regen_bonus:   0,
         },
     );
     client.init_upgrade_config(&admin, &blueprints);
@@ -259,8 +288,246 @@ fn test_stats_accumulate_across_upgrades() {
 }
 
 #[test]
+fn test_apply_upgrade_rate_limited_after_default_window_quota() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+
+    let player = Address::generate(&env);
+    // Three installs at the scaled prices (100 + 160 + 256 = 516) plus
+    // headroom, so the default 3-calls-per-window quota is what stops call 4.
+    credit_resource(
+        &env,
+        &client.address,
+        &player,
+        symbol_short!("dust"),
+        budget_for_scanners(3) + 100,
+    );
+
+    // Default ShipUpgrade limit is 3 calls / 300 s.
+    for _ in 0..3 {
+        client.apply_upgrade(&player, &10u64, &symbol_short!("scanner"));
+    }
+    let err = client
+        .try_apply_upgrade(&player, &10u64, &symbol_short!("scanner"))
+        .unwrap_err();
+    assert_eq!(err, Ok(ShipUpgradeError::RateLimitExceeded));
+}
+
+#[test]
+fn test_apply_upgrade_rejects_zero_ship_id() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+    let player = Address::generate(&env);
+
+    let err = client
+        .try_apply_upgrade(&player, &0u64, &symbol_short!("scanner"))
+        .unwrap_err();
+    assert_eq!(err, Ok(ShipUpgradeError::InvalidShipId));
+}
+
+#[test]
+fn test_batch_upgrade_rejects_empty_batch() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+    let player = Address::generate(&env);
+
+    let components: soroban_sdk::Vec<soroban_sdk::Symbol> = soroban_sdk::vec![&env];
+    let err = client
+        .try_batch_upgrade(&player, &11u64, &components)
+        .unwrap_err();
+    assert_eq!(err, Ok(ShipUpgradeError::EmptyBatch));
+}
+
+#[test]
+fn test_init_upgrade_config_rejects_empty_blueprints() {
+    let (env, client, admin) = setup();
+    let empty: Map<soroban_sdk::Symbol, UpgradeBlueprint> = Map::new(&env);
+
+    let err = client
+        .try_init_upgrade_config(&admin, &empty)
+        .unwrap_err();
+    assert_eq!(err, Ok(ShipUpgradeError::InvalidBlueprint));
+}
+
+#[test]
+fn test_apply_regen_upgrade_requires_initialized_admin() {
+    let (_env, client, _admin) = setup();
+
+    let err = client
+        .try_apply_regen_upgrade(&1u64, &5u32)
+        .unwrap_err();
+    assert_eq!(err, Ok(ShipUpgradeError::NotInitialized));
+}
+
+#[test]
+fn test_set_rate_limit_config_rejects_non_rbac_admin() {
+    let (env, client, admin) = setup();
+    client.init_rbac(&admin);
+    let intruder = Address::generate(&env);
+
+    let err = client
+        .try_set_rate_limit_config(
+            &intruder,
+            &Operation::ShipUpgrade,
+            &RateLimitConfig { max_calls: 1000, window_seconds: 1 },
+        )
+        .unwrap_err();
+    assert_eq!(err, Ok(RateLimitError::Unauthorized));
+}
+
+#[test]
 fn test_max_batch_upgrades_constant_is_two() {
     assert_eq!(MAX_BATCH_UPGRADES, 2);
+}
+
+// ── Rebalanced cost curve (Issue #454) ───────────────────────────────────────
+
+#[test]
+fn test_quote_upgrade_cost_reflects_the_rebalanced_curve() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+
+    // Tier 0 is unscaled: the first scanner costs its base price of 100.
+    assert_eq!(client.quote_upgrade_cost(&1u64, &symbol_short!("scanner")), 100);
+
+    let player = Address::generate(&env);
+    credit_resource(&env, &client.address, &player, symbol_short!("dust"), 1_000);
+    client.apply_upgrade(&player, &1u64, &symbol_short!("scanner"));
+
+    // Tier 1 is +60%: 160.
+    assert_eq!(client.quote_upgrade_cost(&1u64, &symbol_short!("scanner")), 160);
+}
+
+#[test]
+fn test_quote_upgrade_cost_is_tier_scoped_to_the_ship() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+
+    let player = Address::generate(&env);
+    credit_resource(&env, &client.address, &player, symbol_short!("dust"), 1_000);
+
+    // Ship 1 gains a module; ship 2 must stay at tier 0.
+    client.apply_upgrade(&player, &1u64, &symbol_short!("scanner"));
+    assert_eq!(client.quote_upgrade_cost(&1u64, &symbol_short!("scanner")), 160);
+    assert_eq!(client.quote_upgrade_cost(&2u64, &symbol_short!("scanner")), 100);
+}
+
+#[test]
+fn test_quote_upgrade_cost_rejects_unknown_component_and_zero_ship() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+
+    let err = client
+        .try_quote_upgrade_cost(&1u64, &symbol_short!("warp"))
+        .unwrap_err();
+    assert_eq!(err, Ok(ShipUpgradeError::UnknownComponent));
+
+    let err = client
+        .try_quote_upgrade_cost(&0u64, &symbol_short!("scanner"))
+        .unwrap_err();
+    assert_eq!(err, Ok(ShipUpgradeError::InvalidShipId));
+}
+
+#[test]
+fn test_default_upgrade_economy_is_the_rebalanced_curve() {
+    let (_env, client, _admin) = setup();
+
+    let econ = client.get_upgrade_economy();
+    assert_eq!(econ.growth_bps, DEFAULT_GROWTH_BPS);
+    assert_eq!(econ.growth_bps, 6_000);
+    assert_eq!(econ.max_cost, DEFAULT_MAX_COST);
+}
+
+#[test]
+fn test_upgrade_burns_more_than_the_base_cost() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+
+    let player = Address::generate(&env);
+    credit_resource(&env, &client.address, &player, symbol_short!("dust"), 1_000);
+
+    client.apply_upgrade(&player, &77u64, &symbol_short!("scanner"));
+    client.apply_upgrade(&player, &77u64, &symbol_short!("scanner"));
+
+    // 100 (tier 0) + 160 (tier 1) burned, and it is reported as sink volume.
+    assert_eq!(client.get_total_upgrade_spend(), 260);
+}
+
+#[test]
+fn test_set_upgrade_economy_restores_flat_pricing() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+
+    client.set_upgrade_economy(
+        &admin,
+        &UpgradeEconomy { growth_bps: 0, max_cost: DEFAULT_MAX_COST },
+    );
+    assert_eq!(client.get_upgrade_economy().growth_bps, 0);
+
+    let player = Address::generate(&env);
+    credit_resource(&env, &client.address, &player, symbol_short!("dust"), 1_000);
+
+    // With growth neutralised, the base price is charged every time.
+    assert_eq!(client.quote_upgrade_cost(&5u64, &symbol_short!("scanner")), 100);
+    client.apply_upgrade(&player, &5u64, &symbol_short!("scanner"));
+    assert_eq!(client.quote_upgrade_cost(&5u64, &symbol_short!("scanner")), 100);
+    client.apply_upgrade(&player, &5u64, &symbol_short!("scanner"));
+    assert_eq!(client.get_total_upgrade_spend(), 200);
+}
+
+#[test]
+fn test_set_upgrade_economy_rejects_non_admin() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+
+    let intruder = Address::generate(&env);
+    let err = client
+        .try_set_upgrade_economy(
+            &intruder,
+            &UpgradeEconomy { growth_bps: 100, max_cost: 10 },
+        )
+        .unwrap_err();
+    assert_eq!(err, Ok(ShipUpgradeError::NotInitialized));
+}
+
+#[test]
+fn test_set_upgrade_economy_rejects_implausible_growth() {
+    let (env, client, admin) = setup();
+    client.init_upgrade_config(&admin, &make_blueprints(&env));
+
+    let err = client
+        .try_set_upgrade_economy(
+            &admin,
+            &UpgradeEconomy { growth_bps: 100_001, max_cost: 10 },
+        )
+        .unwrap_err();
+    assert_eq!(err, Ok(ShipUpgradeError::InvalidEconomy));
+}
+
+#[test]
+fn test_scaled_upgrade_cost_matches_the_documented_curve() {
+    // 100 -> 160 -> 256 -> 409 -> 654 at +60% per installed module.
+    let expected = [100u32, 160, 256, 409, 654];
+    for (tier, want) in expected.iter().enumerate() {
+        assert_eq!(
+            scaled_upgrade_cost(100, tier as u32, DEFAULT_GROWTH_BPS, DEFAULT_MAX_COST),
+            *want,
+            "tier {tier} should cost {want}"
+        );
+    }
+}
+
+#[test]
+fn test_full_buildout_costs_more_than_the_old_flat_schedule() {
+    let flat: u32 = (0..MAX_MODULES).map(|_| 100).sum();
+    let scaled: u32 = budget_for_scanners(MAX_MODULES);
+
+    assert_eq!(flat, 500);
+    assert_eq!(scaled, 1_579);
+    assert!(
+        scaled > flat * 3,
+        "the rebalanced curve must be a >3x sink over a full build-out"
+    );
 }
 
 #[test]

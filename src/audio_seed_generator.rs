@@ -24,6 +24,24 @@ pub enum AudioError {
     InvalidPreset = 4,
 }
 
+impl crate::error_standard::StandardContractError for AudioError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidLayer | Self::InvalidNebulaId | Self::InvalidPreset => {
+                (ErrorKind::Validation, false)
+            }
+            Self::SeedNotFound => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "audio_seed_generator",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 #[contracttype]
 pub struct InstrumentParams {

@@ -33,6 +33,28 @@ pub enum WormholeError {
     EnergyManagerError = 10,
 }
 
+impl crate::error_standard::StandardContractError for WormholeError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidDestination | Self::SameNebulaTravel => (ErrorKind::Validation, false),
+            Self::InsufficientEnergy | Self::MaxWormholesReached => {
+                (ErrorKind::ResourceLimit, false)
+            }
+            Self::ShipNotFound | Self::WormholeNotFound => (ErrorKind::NotFound, false),
+            Self::WormholeExpired | Self::WormholeClosed => (ErrorKind::Conflict, false),
+            Self::UnauthorizedTravel => (ErrorKind::Authorization, false),
+            Self::EnergyManagerError => (ErrorKind::Internal, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "wormhole_traveler",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 #[contracttype]
 pub struct Wormhole {

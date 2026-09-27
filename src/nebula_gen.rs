@@ -26,6 +26,7 @@ use crate::gas_optimized_compute::{
     derive_spread, expand_u64_to_bytes32, fold_seed_bytes, is_zero_bytes32, splitmix64,
     GOLDEN_GAMMA,
 };
+use crate::rate_limiter::{check_rate_limit, Operation, RateLimitError};
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -63,6 +64,38 @@ pub enum NebulaError {
     InvalidRegionId     = 9,
     /// Anomaly index is out of bounds for this layout.
     AnomalyOutOfBounds  = 10,
+    /// Caller exceeded the layout-generation rate limit (DoS prevention).
+    RateLimitExceeded   = 11,
+}
+
+impl crate::error_standard::StandardContractError for NebulaError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::NotInitialized | Self::LayoutNotFound => (ErrorKind::NotFound, false),
+            Self::AlreadyInitialized => (ErrorKind::Conflict, false),
+            Self::InvalidSeed
+            | Self::InvalidIndex
+            | Self::InvalidSize
+            | Self::InvalidTtl
+            | Self::InvalidShipId
+            | Self::InvalidRegionId
+            | Self::AnomalyOutOfBounds => (ErrorKind::Validation, false),
+            Self::RateLimitExceeded => (ErrorKind::ResourceLimit, true),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "nebula_gen",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
+impl From<RateLimitError> for NebulaError {
+    fn from(_: RateLimitError) -> Self {
+        NebulaError::RateLimitExceeded
+    }
 }
 
 // ── Data types ───────────────────────────────────────────────
@@ -299,6 +332,9 @@ impl NebulaGen {
 
         // ── Require caller authentication ─────────────────────
         caller.require_auth();
+
+        // ── Rate limit: layout generation is CPU + storage heavy ──
+        check_rate_limit(&env, &caller, Operation::NebulaGeneration)?;
 
         // ── Input validation (Issue #170) ─────────────────────
         if ship_id < MIN_SHIP_ID {

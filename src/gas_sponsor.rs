@@ -65,6 +65,32 @@ pub enum SponsorError {
     InvalidSignature = 12,
 }
 
+impl crate::error_standard::StandardContractError for SponsorError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::AlreadySponsored => (ErrorKind::Conflict, false),
+            Self::DailyCapReached | Self::PerUserDailyCapReached => {
+                (ErrorKind::ResourceLimit, true)
+            }
+            Self::InsufficientFunds | Self::PerUserCapReached => (ErrorKind::ResourceLimit, false),
+            Self::Unauthorized | Self::ProfileNotVerified | Self::FraudDetected => {
+                (ErrorKind::Authorization, false)
+            }
+            Self::InvalidAmount | Self::SessionKeyInvalid | Self::InvalidSignature => {
+                (ErrorKind::Validation, false)
+            }
+            Self::NotInitialized => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "gas_sponsor",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Data Structures ───────────────────────────────────────────────────────
 
 /// Sponsorship configuration parameters.

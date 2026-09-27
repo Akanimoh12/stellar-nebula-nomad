@@ -36,6 +36,23 @@ pub enum GuildQuestError {
     Unauthorized = 5,
 }
 
+impl crate::error_standard::StandardContractError for GuildQuestError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::QuestNotFound => (ErrorKind::NotFound, false),
+            Self::QuestExpired | Self::QuestAlreadyCompleted => (ErrorKind::Conflict, false),
+            Self::NotAllianceMember | Self::Unauthorized => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "guild_quests",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Functions ────────────────────────────────────────────────────────────────
 
 /// Create a new cooperative guild quest.

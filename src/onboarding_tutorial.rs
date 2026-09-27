@@ -37,6 +37,30 @@ pub enum OnboardingError {
     Unauthorized = 11,
 }
 
+impl crate::error_standard::StandardContractError for OnboardingError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::AlreadyInitialized
+            | Self::ProfileAlreadyExists
+            | Self::TutorialAlreadyStarted
+            | Self::TutorialNotStarted
+            | Self::StepOutOfOrder
+            | Self::StepAlreadyCompleted
+            | Self::TutorialAlreadyCompleted => (ErrorKind::Conflict, false),
+            Self::ProfileNotFound => (ErrorKind::NotFound, false),
+            Self::InvalidStep | Self::InvalidPath => (ErrorKind::Validation, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "onboarding_tutorial",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 fn progress_key(player: &Address) -> (soroban_sdk::Symbol, Address) {
     (symbol_short!("onb_prg"), player.clone())
 }

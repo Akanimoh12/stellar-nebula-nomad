@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, contracttype, symbol_short, Address, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Address, BytesN, Env, Symbol};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -7,6 +7,23 @@ pub enum IndexerError {
     InvalidCallback = 1,
     Unauthorized = 2,
     RateLimitExceeded = 3,
+}
+
+impl crate::error_standard::StandardContractError for IndexerError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidCallback => (ErrorKind::Validation, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::RateLimitExceeded => (ErrorKind::ResourceLimit, true),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "indexer_callbacks",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 #[contracttype]

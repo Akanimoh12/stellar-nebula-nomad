@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Env, Symbol, Vec};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -7,6 +7,23 @@ pub enum ThemeError {
     InvalidTheme = 1,
     Unauthorized = 2,
     ShipNotFound = 3,
+}
+
+impl crate::error_standard::StandardContractError for ThemeError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidTheme => (ErrorKind::Validation, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::ShipNotFound => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "theme_customizer",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 #[contracttype]

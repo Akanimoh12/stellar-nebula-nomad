@@ -2,11 +2,8 @@ use soroban_sdk::{
     contracterror, contracttype, symbol_short, Address, Env, Map, String, Symbol, Vec,
 };
 
-// Symbol::to_string() is implemented for non-wasm targets only (requires std::string::String).
 #[cfg(not(target_family = "wasm"))]
 extern crate std;
-#[cfg(not(target_family = "wasm"))]
-use std::string::ToString as _;
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
@@ -30,6 +27,28 @@ pub enum LeaderboardError {
     ResetNotDue = 7,
     /// Admin has already been set; set_admin is a one-time initializer (Issue #237).
     AlreadyInitialized = 8,
+}
+
+impl crate::error_standard::StandardContractError for LeaderboardError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidCategory | Self::InvalidTimePeriod | Self::InvalidRegion => {
+                (ErrorKind::Validation, false)
+            }
+            Self::PlayerNotFound => (ErrorKind::NotFound, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::LeaderboardFull => (ErrorKind::ResourceLimit, false),
+            Self::ResetNotDue => (ErrorKind::Conflict, true),
+            Self::AlreadyInitialized => (ErrorKind::Conflict, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "leaderboards",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 // ── Storage Keys ──────────────────────────────────────────────────────────────

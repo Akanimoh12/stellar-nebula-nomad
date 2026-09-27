@@ -1,0 +1,21 @@
+# Local development image: Rust toolchain + cargo-watch for hot reload.
+FROM rust:1.83-bookworm
+
+RUN rustup target add wasm32-unknown-unknown \
+    && rustup component add rustfmt clippy \
+    && cargo install cargo-watch --locked
+
+WORKDIR /workspace
+
+# Pre-fetch crates when the lockfile is present so first watch is faster.
+COPY Cargo.toml ./
+COPY src ./src
+RUN cargo fetch || true
+
+COPY . .
+
+ENV CARGO_TERM_COLOR=always
+ENV RUST_BACKTRACE=1
+
+# Default: rebuild/re-test the library on file changes.
+CMD ["cargo", "watch", "-q", "-c", "-w", "src", "-w", "tests", "-x", "check", "-x", "test --lib"]

@@ -249,6 +249,44 @@ pub enum EventError {
     ClaimWindowClosed = 24,
 }
 
+impl crate::error_standard::StandardContractError for EventError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::EventAlreadyPassed
+            | Self::EventAlreadyExecuted
+            | Self::ChallengeExpired
+            | Self::AlreadyClaimed
+            | Self::ChallengeNotComplete
+            | Self::ExclusiveEventConflict
+            | Self::InvalidEventState
+            | Self::ClaimWindowClosed => (ErrorKind::Conflict, false),
+            Self::EventNotFound
+            | Self::ChallengeNotFound
+            | Self::NoActiveSeason
+            | Self::NoEventReward => (ErrorKind::NotFound, false),
+            Self::EventNotReady
+            | Self::RecurringNotDue
+            | Self::ChallengeNotStarted
+            | Self::EventCooldownActive => (ErrorKind::Conflict, true),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::TooManyActiveEvents | Self::TooManyChallenges | Self::TooManySeasonalEvents => {
+                (ErrorKind::ResourceLimit, false)
+            }
+            Self::BurstLimitExceeded => (ErrorKind::ResourceLimit, true),
+            Self::InvalidEventType | Self::InvalidEventWindow | Self::InvalidRewardPool => {
+                (ErrorKind::Validation, false)
+            }
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "event_scheduler",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
 fn require_admin(env: &Env, caller: &Address) -> Result<(), EventError> {
@@ -905,7 +943,7 @@ pub fn schedule_weekly_festival(
     admin: &Address,
     reward_pool: i128,
 ) -> Result<u64, EventError> {
-    schedule_recurring_event(env, admin, RecurringEventType::WeeklyFestival, reward_pool)
+    schedule_recurring_event(env, admin, &RecurringEventType::WeeklyFestival, reward_pool)
 }
 
 /// Get total number of events scheduled.

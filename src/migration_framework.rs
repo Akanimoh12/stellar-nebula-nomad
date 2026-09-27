@@ -20,6 +20,8 @@ pub const MAX_MIGRATION_HISTORY: u32 = 50;
 #[derive(Clone)]
 #[contracttype]
 pub enum MigrationKey {
+    /// Address allowed to run privileged migration operations.
+    Admin,
     /// Current schema version.
     CurrentSchemaVersion,
     /// Migration history entries.
@@ -56,6 +58,26 @@ pub enum MigrationError {
     NoCheckpoint = 7,
     /// Migration not found.
     MigrationNotFound = 8,
+}
+
+impl crate::error_standard::StandardContractError for MigrationError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::MigrationInProgress => (ErrorKind::Conflict, true),
+            Self::IncompatibleSchema => (ErrorKind::Validation, false),
+            Self::ValidationFailed | Self::RollbackFailed => (ErrorKind::Internal, false),
+            Self::BatchTooLarge => (ErrorKind::ResourceLimit, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::NoCheckpoint | Self::MigrationNotFound => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "migration_framework",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 // ─── Data Structures ─────────────────────────────────────────────────────
@@ -108,13 +130,29 @@ pub struct DryRunReport {
     pub validation_result: ValidationResult,
 }
 
+// ─── Access Control ─────────────────────────────────────────────────────
+
+/// Require `admin` to authorize the call and to be the admin recorded by
+/// `initialize_migrations`.
+fn require_admin(env: &Env, admin: &Address) -> Result<(), MigrationError> {
+    admin.require_auth();
+
+    let stored: Option<Address> = env.storage().instance().get(&MigrationKey::Admin);
+    match stored {
+        Some(current) if current == *admin => Ok(()),
+        _ => Err(MigrationError::Unauthorized),
+    }
+}
+
 // ─── Initialization ─────────────────────────────────────────────────────
 
-/// Initialize the migration framework.
+/// Initialize the migration framework and record `admin` as the only address
+/// allowed to run privileged migration operations.
 pub fn initialize_migrations(env: &Env, admin: &Address, initial_version: u32) -> Result<(), MigrationError> {
     admin.require_auth();
 
     if !env.storage().instance().has(&MigrationKey::CurrentSchemaVersion) {
+        env.storage().instance().set(&MigrationKey::Admin, admin);
         env.storage()
             .instance()
             .set(&MigrationKey::CurrentSchemaVersion, &initial_version);
@@ -146,7 +184,7 @@ pub fn plan_migration(
     to_version: u32,
     description: Symbol,
 ) -> Result<MigrationRecord, MigrationError> {
-    admin.require_auth();
+    require_admin(env, admin)?;
 
     let current = get_current_version(env);
     if from_version > current {
@@ -183,7 +221,7 @@ pub fn dry_run_migration(
     migration_id: u32,
     sample_records: Vec<Bytes>,
 ) -> Result<DryRunReport, MigrationError> {
-    admin.require_auth();
+    require_admin(env, admin)?;
 
     if (sample_records.len() as u32) > MAX_MIGRATION_BATCH {
         return Err(MigrationError::BatchTooLarge);
@@ -245,7 +283,7 @@ pub fn mark_incompatible(
     from_version: u32,
     to_version: u32,
 ) -> Result<(), MigrationError> {
-    admin.require_auth();
+    require_admin(env, admin)?;
 
     env.storage()
         .instance()
@@ -270,7 +308,7 @@ pub fn execute_migration_batch(
     total_batches: u32,
     batch_data: Vec<Bytes>,
 ) -> Result<BatchMigrationState, MigrationError> {
-    admin.require_auth();
+    require_admin(env, admin)?;
 
     if (batch_data.len() as u32) > MAX_MIGRATION_BATCH {
         return Err(MigrationError::BatchTooLarge);
@@ -316,7 +354,7 @@ pub fn rollback_migration(
     admin: &Address,
     migration_id: u32,
 ) -> Result<(), MigrationError> {
-    admin.require_auth();
+    require_admin(env, admin)?;
 
     let checkpoint: Option<BatchMigrationState> = env
         .storage()
@@ -342,14 +380,17 @@ pub fn rollback_migration(
 
 // ─── Migration History ──────────────────────────────────────────────────
 
-/// Record a completed migration in history.
+/// Record a completed migration in history. Admin-only.
 pub fn record_migration_completion(
     env: &Env,
+    admin: &Address,
     migration_id: u32,
     from_version: u32,
     to_version: u32,
     record_count: u32,
-) {
+) -> Result<(), MigrationError> {
+    require_admin(env, admin)?;
+
     let record = MigrationRecord {
         id: migration_id,
         from_version,
@@ -371,6 +412,194 @@ pub fn record_migration_completion(
             env.ledger().timestamp(),
         ),
     );
+
+    Ok(())
 }
 
 use soroban_sdk::BytesN;
+
+// ─── Tests ───────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::{contract, contractimpl, testutils::Address as _};
+
+    #[contract]
+    struct StubContract;
+    #[contractimpl]
+    impl StubContract {}
+
+    fn setup_env() -> (Env, Address) {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        (env, admin)
+    }
+
+    #[test]
+    fn test_initialize_and_get_version() {
+        let (env, admin) = setup_env();
+        let contract = env.register(StubContract, ());
+
+        env.as_contract(&contract, || {
+            assert_eq!(get_current_version(&env), 1);
+            initialize_migrations(&env, &admin, 2).unwrap();
+            assert_eq!(get_current_version(&env), 2);
+
+            // Re-initializing does not overwrite initial version
+            initialize_migrations(&env, &admin, 3).unwrap();
+            assert_eq!(get_current_version(&env), 2);
+        });
+    }
+
+    #[test]
+    fn test_plan_migration_success_and_incompatible_error() {
+        let (env, admin) = setup_env();
+        let contract = env.register(StubContract, ());
+
+        env.as_contract(&contract, || {
+            initialize_migrations(&env, &admin, 1).unwrap();
+            let record = plan_migration(&env, &admin, 1, 2, symbol_short!("plan_v2")).unwrap();
+            assert_eq!(record.from_version, 1);
+            assert_eq!(record.to_version, 2);
+
+            // from_version > current_version yields error
+            let err = plan_migration(&env, &admin, 5, 6, symbol_short!("invalid"));
+            assert_eq!(err, Err(MigrationError::IncompatibleSchema));
+        });
+    }
+
+    #[test]
+    fn test_dry_run_migration() {
+        let (env, admin) = setup_env();
+        let contract = env.register(StubContract, ());
+
+        env.as_contract(&contract, || {
+            initialize_migrations(&env, &admin, 1).unwrap();
+            let record = plan_migration(&env, &admin, 1, 2, symbol_short!("plan_v2")).unwrap();
+
+            let mut sample_data = Vec::new(&env);
+            sample_data.push_back(Bytes::from_slice(&env, b"payload1"));
+            sample_data.push_back(Bytes::from_slice(&env, b"payload2"));
+
+            let report = dry_run_migration(&env, &admin, record.id, sample_data).unwrap();
+            assert!(report.would_succeed);
+            assert_eq!(report.records_affected, 2);
+
+            // Empty record triggers validation error in dry run
+            let mut invalid_sample = Vec::new(&env);
+            invalid_sample.push_back(Bytes::new(&env));
+            let report_fail = dry_run_migration(&env, &admin, record.id, invalid_sample).unwrap();
+            assert!(!report_fail.would_succeed);
+
+            // Batch size exceeding MAX_MIGRATION_BATCH yields error
+            let mut oversized = Vec::new(&env);
+            for _ in 0..MAX_MIGRATION_BATCH + 1 {
+                oversized.push_back(Bytes::from_slice(&env, b"x"));
+            }
+            let err = dry_run_migration(&env, &admin, record.id, oversized);
+            assert_eq!(err, Err(MigrationError::BatchTooLarge));
+        });
+    }
+
+    #[test]
+    fn test_execute_batch_and_rollback() {
+        let (env, admin) = setup_env();
+        let contract = env.register(StubContract, ());
+
+        env.as_contract(&contract, || {
+            initialize_migrations(&env, &admin, 1).unwrap();
+            let record = plan_migration(&env, &admin, 1, 2, symbol_short!("v2")).unwrap();
+
+            let mut batch_data = Vec::new(&env);
+            batch_data.push_back(Bytes::from_slice(&env, b"data1"));
+
+            let batch_state = execute_migration_batch(&env, &admin, record.id, 0, 1, batch_data).unwrap();
+            assert_eq!(batch_state.records_processed, 1);
+            assert_eq!(batch_state.migration_id, record.id);
+
+            // Rollback succeeds when checkpoint exists
+            rollback_migration(&env, &admin, record.id).unwrap();
+
+            // Second rollback fails because checkpoint was consumed/removed
+            let err = rollback_migration(&env, &admin, record.id);
+            assert_eq!(err, Err(MigrationError::NoCheckpoint));
+        });
+    }
+
+    #[test]
+    fn test_backward_compatibility() {
+        let (env, admin) = setup_env();
+        let contract = env.register(StubContract, ());
+
+        env.as_contract(&contract, || {
+            initialize_migrations(&env, &admin, 1).unwrap();
+            assert!(is_backward_compatible(&env, 1, 2));
+            mark_incompatible(&env, &admin, 1, 2).unwrap();
+            assert!(!is_backward_compatible(&env, 1, 2));
+        });
+    }
+
+    #[test]
+    fn test_record_migration_completion() {
+        let (env, admin) = setup_env();
+        let contract = env.register(StubContract, ());
+
+        env.as_contract(&contract, || {
+            initialize_migrations(&env, &admin, 1).unwrap();
+            record_migration_completion(&env, &admin, 101, 1, 2, 50).unwrap();
+        });
+    }
+
+    #[test]
+    fn test_privileged_operations_reject_non_admin() {
+        let (env, admin) = setup_env();
+        let intruder = Address::generate(&env);
+        let contract = env.register(StubContract, ());
+
+        env.as_contract(&contract, || {
+            initialize_migrations(&env, &admin, 1).unwrap();
+
+            let samples: Vec<Bytes> = Vec::new(&env);
+            assert_eq!(
+                plan_migration(&env, &intruder, 1, 2, symbol_short!("v2")),
+                Err(MigrationError::Unauthorized)
+            );
+            assert_eq!(
+                dry_run_migration(&env, &intruder, 1, samples.clone()).err(),
+                Some(MigrationError::Unauthorized)
+            );
+            assert_eq!(
+                mark_incompatible(&env, &intruder, 1, 2),
+                Err(MigrationError::Unauthorized)
+            );
+            assert_eq!(
+                execute_migration_batch(&env, &intruder, 1, 0, 1, samples).err(),
+                Some(MigrationError::Unauthorized)
+            );
+            assert_eq!(
+                rollback_migration(&env, &intruder, 1),
+                Err(MigrationError::Unauthorized)
+            );
+            assert_eq!(
+                record_migration_completion(&env, &intruder, 1, 1, 2, 0),
+                Err(MigrationError::Unauthorized)
+            );
+        });
+    }
+
+    #[test]
+    fn test_privileged_operations_reject_before_initialization() {
+        let (env, admin) = setup_env();
+        let contract = env.register(StubContract, ());
+
+        env.as_contract(&contract, || {
+            assert_eq!(
+                mark_incompatible(&env, &admin, 1, 2),
+                Err(MigrationError::Unauthorized)
+            );
+        });
+    }
+}
+

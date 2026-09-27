@@ -234,6 +234,24 @@ pub enum SeasonError {
     AllChaptersDone = 7,
 }
 
+impl crate::error_standard::StandardContractError for SeasonError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::NoActiveSeason | Self::NoRewardToClaim => (ErrorKind::NotFound, false),
+            Self::SeasonAlreadyStarted | Self::AllChaptersDone => (ErrorKind::Conflict, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::SeasonNotExpired | Self::ChapterNotReady => (ErrorKind::Conflict, true),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "seasons",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 /// Zero-based chapter index for `elapsed` seconds into a season, clamped to
 /// the final chapter once the season has run its course.
 fn chapter_index(elapsed: u64) -> u32 {

@@ -36,6 +36,26 @@ pub enum VaultError {
     ArithmeticOverflow = 6,
 }
 
+impl crate::error_standard::StandardContractError for VaultError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::VaultNotFound => (ErrorKind::NotFound, false),
+            Self::NotOwner => (ErrorKind::Authorization, false),
+            Self::StillLocked => (ErrorKind::Conflict, true),
+            Self::AlreadyClaimed => (ErrorKind::Conflict, false),
+            Self::InvalidAmount => (ErrorKind::Validation, false),
+            Self::ArithmeticOverflow => (ErrorKind::ResourceLimit, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "treasure_vault",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 /// A time-locked treasure vault.
 #[derive(Clone)]
 #[contracttype]

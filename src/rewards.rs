@@ -71,6 +71,26 @@ pub enum RewardError {
     InvalidTier = 8,
 }
 
+impl crate::error_standard::StandardContractError for RewardError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidCode | Self::SelfReferral | Self::InvalidTier => {
+                (ErrorKind::Validation, false)
+            }
+            Self::CodeExists | Self::AlreadyClaimed => (ErrorKind::Conflict, false),
+            Self::ReferrerNotFound | Self::NoRewardsToClaim => (ErrorKind::NotFound, false),
+            Self::SuspiciousActivity => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "rewards",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ─── Data Types ────────────────────────────────────────────────────────────
 /// Referrer statistics and analytics
 #[derive(Clone, Debug, Eq, PartialEq)]

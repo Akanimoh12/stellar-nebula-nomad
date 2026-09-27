@@ -9,6 +9,23 @@ pub enum SharedError {
     Unauthorized = 3,
 }
 
+impl crate::error_standard::StandardContractError for SharedError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidAddress => (ErrorKind::Validation, false),
+            Self::MathOverflow => (ErrorKind::ResourceLimit, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "shared_lib",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 pub fn validate_address(_env: &Env, auth: Address) -> Result<(), SharedError> {
     auth.require_auth();
     Ok(())

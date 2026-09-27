@@ -1,6 +1,6 @@
 //! Deterministic environmental state simulation.
 //!
-use soroban_sdk::{contracterror, contracttype, symbol_short, Env, Symbol, Vec};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Env, Symbol};
 
 const ENVIRONMENTAL_PRESETS: [&str; 8] = [
     "calm",
@@ -27,6 +27,22 @@ pub enum EnvironmentError {
     InvalidCondition = 1,
     InvalidNebula = 2,
     SimulationFailed = 3,
+}
+
+impl crate::error_standard::StandardContractError for EnvironmentError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidCondition | Self::InvalidNebula => (ErrorKind::Validation, false),
+            Self::SimulationFailed => (ErrorKind::Internal, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "environment_simulator",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

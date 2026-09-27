@@ -151,6 +151,25 @@ groups:
           summary: "Migration timeout - exceeded 1 hour"
           description: "Data migration has been running for over 1 hour."
 
+      # Backup pipeline
+      - alert: BackupFailed
+        expr: backup_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup operation failed"
+          description: "Last contract-state backup attempt failed."
+
+      - alert: NoRecentBackup
+        expr: (time() - backup_last_success_timestamp) > 172800
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No successful backup in 48 hours"
+          description: "Last successful backup was more than 48 hours ago."
+
       # Active user count anomaly
       - alert: ActiveUserCountAnomalous
         expr: |

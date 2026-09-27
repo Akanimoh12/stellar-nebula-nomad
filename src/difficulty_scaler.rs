@@ -26,6 +26,21 @@ pub enum DifficultyError {
     InvalidLevel = 1,
 }
 
+impl crate::error_standard::StandardContractError for DifficultyError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InvalidLevel => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "difficulty_scaler",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 /// Rarity weight distribution for difficulty scaling.
 /// Each weight is a percentage (0-100) summing to 100.
 #[derive(Clone)]

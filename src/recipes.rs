@@ -7,6 +7,21 @@ pub enum RecipeError {
     RecipeNotFound = 1,
 }
 
+impl crate::error_standard::StandardContractError for RecipeError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::RecipeNotFound => (ErrorKind::NotFound, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "recipes",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 // ── Rare rarity threshold ─────────────────────────────────────────────────────
 
 /// Recipes with rarity >= this value are considered rare and require an unlock.

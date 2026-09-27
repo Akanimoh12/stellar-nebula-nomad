@@ -24,6 +24,29 @@ pub enum SkinError {
     NotHighestBidder = 13,
 }
 
+impl crate::error_standard::StandardContractError for SkinError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::SkinNotFound | Self::AuctionNotFound => (ErrorKind::NotFound, false),
+            Self::NotOwner | Self::NotHighestBidder => (ErrorKind::Authorization, false),
+            Self::AlreadyApplied | Self::AuctionNotActive => (ErrorKind::Conflict, false),
+            Self::InvalidRarity | Self::SkinPackEmpty | Self::InvalidFusion | Self::BidTooLow => {
+                (ErrorKind::Validation, false)
+            }
+            Self::SkinLimitReached | Self::FusionLevelMax | Self::NotEnoughSkins => {
+                (ErrorKind::ResourceLimit, false)
+            }
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "ship_customization",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
+}
+
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub enum SkinRarity {

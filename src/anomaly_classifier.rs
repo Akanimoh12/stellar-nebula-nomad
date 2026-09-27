@@ -1,6 +1,6 @@
 //! Classification of suspicious gameplay and telemetry anomalies.
 //!
-use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Env, Symbol, Vec};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Env, Symbol, Vec};
 
 #[derive(Clone)]
 #[contracttype]
@@ -25,6 +25,23 @@ pub enum AnomalyError {
     InsufficientFeatures = 1,
     NotFound = 2,
     Unauthorized = 3,
+}
+
+impl crate::error_standard::StandardContractError for AnomalyError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::InsufficientFeatures => (ErrorKind::ResourceLimit, false),
+            Self::NotFound => (ErrorKind::NotFound, false),
+            Self::Unauthorized => (ErrorKind::Authorization, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "anomaly_classifier",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 pub fn classify_anomaly(
@@ -139,7 +156,7 @@ pub fn get_classification(env: &Env, anomaly_id: u64) -> Option<ClassificationRe
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{contract, contractimpl, vec, Env};
+    use soroban_sdk::{contract, contractimpl, vec, Address, Env};
 
     #[contract]
     struct Stub;

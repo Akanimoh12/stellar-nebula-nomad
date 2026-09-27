@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Env, Vec, BytesN};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Env};
 
 const WEEKLY_GAS_THRESHOLD: u64 = 10_000;
 const CO2_PER_GAS: u64 = 42; // 42 gCO2 per gas unit approximated
@@ -25,6 +25,22 @@ pub enum SustainabilityError {
     NoRewardEligible = 1,
     InvalidGasValue = 2,
     Unauthorized = 3,
+}
+
+impl crate::error_standard::StandardContractError for SustainabilityError {
+    fn descriptor(self) -> crate::error_standard::ErrorDescriptor {
+        use crate::error_standard::ErrorKind;
+        let (kind, retryable) = match self {
+            Self::NoRewardEligible | Self::Unauthorized => (ErrorKind::Authorization, false),
+            Self::InvalidGasValue => (ErrorKind::Validation, false),
+        };
+        crate::error_standard::ErrorDescriptor {
+            module: "sustainability_metrics",
+            code: self as u32,
+            kind,
+            retryable,
+        }
+    }
 }
 
 pub fn record_transaction_footprint(
