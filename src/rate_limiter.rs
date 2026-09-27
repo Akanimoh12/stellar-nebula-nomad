@@ -35,6 +35,8 @@ pub enum Operation {
     PrivacyCommit,
     /// `route_calculation` — navigation route calculation.
     RouteCalculation,
+    /// `repair_ship` — paid hull repair, a resource sink (Issue #453).
+    ShipRepair,
 }
 
 // ── Config types ──────────────────────────────────────────────
@@ -69,6 +71,11 @@ impl RateLimitConfig {
     }
     pub fn default_route_calculation() -> Self {
         Self { max_calls: 15, window_seconds: 3600 }  // 15 route calcs / hour
+    }
+    /// Repairs are priced per durability point and are the game's main
+    /// resource sink (Issue #453), so the budget is deliberately tight.
+    pub fn default_ship_repair() -> Self {
+        Self { max_calls: 3, window_seconds: 300 }  // 3 repairs / 5 min
     }
 }
 
@@ -145,6 +152,7 @@ pub fn check_rate_limit(
             Operation::BatchOperation   => RateLimitConfig::default_batch_operation(),
             Operation::PrivacyCommit    => RateLimitConfig::default_privacy_commit(),
             Operation::RouteCalculation => RateLimitConfig::default_route_calculation(),
+            Operation::ShipRepair       => RateLimitConfig::default_ship_repair(),
         });
 
     let now         = env.ledger().timestamp();
