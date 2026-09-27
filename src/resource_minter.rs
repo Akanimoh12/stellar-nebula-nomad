@@ -11,10 +11,7 @@
 use crate::nebula_explorer::{CellType, NebulaLayout};
 use crate::nebula_gen::{NebulaError as NebulaGenError, NebulaGen};
 use crate::rate_limiter::{check_rate_limit, Operation, RateLimitError};
-use crate::ship_nft::{self};
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec,
-};
+use crate::economics::anti_whale::{process_anti_whale_action, AntiWhaleError};
 
 pub type AssetId = ResourceType;
 
@@ -81,6 +78,18 @@ pub enum MinterError {
     ArithmeticOverflow = 204,
     /// The account holds less than the requested debit amount (Issue #281).
     InsufficientBalance = 205,
+    /// Requested amount exceeds anti-whale daily operation cap (Issue #455).
+    DailyCapExceeded = 206,
+}
+
+impl From<AntiWhaleError> for MinterError {
+    fn from(err: AntiWhaleError) -> Self {
+        match err {
+            AntiWhaleError::DailyCapExceeded => MinterError::DailyCapExceeded,
+            AntiWhaleError::ArithmeticOverflow => MinterError::ArithmeticOverflow,
+            AntiWhaleError::InvalidAmount => MinterError::InvalidAmount,
+        }
+    }
 }
 
 impl crate::error_standard::StandardContractError for MinterError {
@@ -144,18 +153,22 @@ impl ResourceMinterContract {
             _ => MinterError::NoLayoutForShip,
         })?;
 
+        // ── Anti-Whale check (Issue #455) ─────────────────────
+        let (effective_amount, _progressive_fee) =
+            process_anti_whale_action(env, &caller, amount)?;
+
         // ── Update balances (checked: Issue #239) ──────────────
         let balance_key = MinterKey::Balance(caller.clone(), resource_type.clone());
         let current: u64 = env.storage().persistent().get(&balance_key).unwrap_or(0);
         let new_balance = current
-            .checked_add(amount)
+            .checked_add(effective_amount)
             .ok_or(MinterError::ArithmeticOverflow)?;
         env.storage().persistent().set(&balance_key, &new_balance);
 
         let supply_key = MinterKey::TotalSupply(resource_type.clone());
         let supply: u64 = env.storage().persistent().get(&supply_key).unwrap_or(0);
         let new_supply = supply
-            .checked_add(amount)
+            .checked_add(effective_amount)
             .ok_or(MinterError::ArithmeticOverflow)?;
         env.storage().persistent().set(&supply_key, &new_supply);
 
@@ -166,21 +179,21 @@ impl ResourceMinterContract {
         let minted_key = MinterKey::TotalMinted(resource_type.clone());
         let minted: u64 = env.storage().persistent().get(&minted_key).unwrap_or(0);
         let new_minted = minted
-            .checked_add(amount)
+            .checked_add(effective_amount)
             .ok_or(MinterError::ArithmeticOverflow)?;
         env.storage().persistent().set(&minted_key, &new_minted);
 
         let record = ResourceRecord {
             owner: caller.clone(),
             resource_type: resource_type.clone(),
-            amount,
+            amount: effective_amount,
             minted_at: env.ledger().timestamp(),
         };
 
         // ── Emit event ─────────────────────────────────────────
         env.events().publish(
             (symbol_short!("Minter"), symbol_short!("minted")),
-            (caller, resource_type, amount),
+            (caller, resource_type, effective_amount),
         );
 
         Ok(record)

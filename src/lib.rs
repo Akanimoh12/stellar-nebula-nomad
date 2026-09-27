@@ -391,6 +391,13 @@ pub use economics::health_dashboard::{
     SupplyDemandMetrics, InflationMetrics, AlertThreshold, AlertEvent, EconomyHealth,
     EconomyHealthDashboard,
 };
+pub use economics::anti_whale::{
+    calculate_diminishing_returns, calculate_progressive_fee, get_daily_cap, get_day_index,
+    get_user_daily_volume, is_exempt, process_anti_whale_action, set_daily_cap, set_exempt,
+    AntiWhaleError, AntiWhaleKey, DAILY_WINDOW_SECONDS, DEFAULT_DAILY_CAP, PROGRESSIVE_FEE_BPS,
+    TIER1_MULTIPLIER_BPS, TIER1_THRESHOLD, TIER2_MULTIPLIER_BPS, TIER2_THRESHOLD,
+    TIER3_MULTIPLIER_BPS,
+};
 
 pub use trading::{
     place_limit_order, cancel_limit_order, get_limit_order, get_trader_orders,
@@ -3128,6 +3135,38 @@ impl NebulaNomadContract {
 
     pub fn generate_economic_report(env: Env) -> (i128, i128, i128) {
         economics::balancer::generate_report(&env)
+    }
+
+    // ── Anti-Whale Economy Mechanics (Issue #455) ──────────────────────
+
+    pub fn process_anti_whale_action(
+        env: Env,
+        user: Address,
+        amount: u64,
+    ) -> Result<(u64, u64), AntiWhaleError> {
+        economics::anti_whale::process_anti_whale_action(&env, &user, amount)
+    }
+
+    pub fn set_anti_whale_cap(env: Env, admin: Address, cap: u64) {
+        admin.require_auth();
+        economics::anti_whale::set_daily_cap(&env, cap);
+    }
+
+    pub fn get_anti_whale_cap(env: Env) -> u64 {
+        economics::anti_whale::get_daily_cap(&env)
+    }
+
+    pub fn set_anti_whale_exempt(env: Env, admin: Address, user: Address, exempt: bool) {
+        admin.require_auth();
+        economics::anti_whale::set_exempt(&env, &user, exempt);
+    }
+
+    pub fn is_anti_whale_exempt(env: Env, user: Address) -> bool {
+        economics::anti_whale::is_exempt(&env, &user)
+    }
+
+    pub fn get_user_daily_volume(env: Env, user: Address) -> u64 {
+        economics::anti_whale::get_user_daily_volume(&env, &user)
     }
 
     // ─── Trading System ───────────────────────────────────────────────────
