@@ -1,17 +1,28 @@
-# cargo-mutants configuration
+# cargo-mutants configuration for stellar-nebula-nomad
+# Configured for priority modules (Issue #478):
+# - src/resource_minter.rs
+# - src/nebula_gen.rs
+# - src/ship_registry.rs
+# - src/access_control.rs
+# - src/nomad_bonding.rs
 
-# Timeout multiplier for mutated test runs
+# Timeout multiplier to prevent false timeouts on complex Soroban VM tests
 timeout_multiplier = 2.0
 
-# Minimum kill rate required (80%)
-minimum_kill_rate = 80.0
-
-# Exclude generated code and tests from mutation targets
-exclude_globs = [
-    "tests/**",
-    "benches/**",
-    "examples/**",
+# Files to examine for mutation testing
+examine_globs = [
+    "src/resource_minter.rs",
+    "src/nebula_gen.rs",
+    "src/ship_registry.rs",
+    "src/access_control.rs",
+    "src/nomad_bonding.rs",
 ]
 
-# Cargo test command line flags
-cargo_args = ["--", "--quiet"]
+# Exclude trivial debug/display representations and non-logic logging
+exclude_globs = [
+    "src/error_standard.rs",
+]
+
+# Baseline cargo test command
+test_tool = "cargo"
+test_args = ["test", "--lib"]
