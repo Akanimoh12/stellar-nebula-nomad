@@ -64,6 +64,26 @@ harness = false
 
 # Fuzz / property-based tests (require --features fuzz for some)
 [[test]]
+name = "chaos_network_failures"
+path = "tests/chaos/network_failures.rs"
+
+[[test]]
+name = "chaos_storage_failures"
+path = "tests/chaos/storage_failures.rs"
+
+[[test]]
+name = "chaos_high_load"
+path = "tests/chaos/high_load.rs"
+
+[[test]]
+name = "chaos_byzantine_attacks"
+path = "tests/chaos/byzantine_attacks.rs"
+
+[[test]]
+name = "chaos_state_corruption"
+path = "tests/chaos/state_corruption.rs"
+
+[[test]]
 name = "fuzz"
 path = "tests/fuzz/fuzz.rs"
 
