@@ -172,8 +172,13 @@ pub fn get_cached_with_ttl(
         Some(entry) => {
             let current_time = env.ledger().timestamp();
             let age = current_time.saturating_sub(entry.cached_at);
+            let invalidated: bool = env
+                .storage()
+                .instance()
+                .get(&CacheKey::IsStale(namespace.clone(), key.clone()))
+                .unwrap_or(false);
 
-            if age > entry.ttl_seconds {
+            if invalidated || !entry.is_valid || age > entry.ttl_seconds {
                 // Mark as stale and emit event.
                 env.storage()
                     .instance()
@@ -204,7 +209,12 @@ pub fn is_cache_valid(env: &Env, namespace: Symbol, key: Symbol) -> bool {
         Some(entry) => {
             let current_time = env.ledger().timestamp();
             let age = current_time.saturating_sub(entry.cached_at);
-            age <= entry.ttl_seconds
+            let invalidated: bool = env
+                .storage()
+                .instance()
+                .get(&CacheKey::IsStale(namespace, key))
+                .unwrap_or(false);
+            !invalidated && entry.is_valid && age <= entry.ttl_seconds
         }
     }
 }
