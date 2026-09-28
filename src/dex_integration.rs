@@ -6,7 +6,10 @@
 
 use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Env, Symbol};
 
-use crate::resource_minter::{get_dex_offer, harvest_resources, next_dex_offer_id, ResourceKey};
+use crate::reentrancy_guard::with_guard;
+use crate::resource_minter::{
+    get_dex_offer, harvest_resources_unguarded, next_dex_offer_id, ResourceKey,
+};
 
 // Re-exported so callers can depend on this module alone.
 pub use crate::resource_minter::{DexOffer, HarvestError, HarvestResult};
@@ -23,8 +26,8 @@ pub enum DexKey {
 
 /// Harvest resources from a layout and immediately list one asset on the DEX.
 ///
-/// Combines [`harvest_resources`] with DEX offer creation in a single call:
-/// the caller avoids paying for two transactions, and the listed amount is
+/// Combines [`crate::resource_minter::harvest_resources`] with DEX offer
+/// creation in a single call: the caller avoids paying for two transactions, and the listed amount is
 /// exactly what the harvest yielded (never more, so an offer can never be
 /// oversold against the seller's balance).
 ///
@@ -34,8 +37,29 @@ pub enum DexKey {
 /// - [`HarvestError::InvalidPrice`] if `min_price <= 0`.
 /// - [`HarvestError::DexFailure`] if the player already hit the listing cap.
 /// - [`HarvestError::AssetNotHarvested`] if `resource` was not in the harvest.
-/// - plus any error from [`harvest_resources`].
+/// - plus any error from [`crate::resource_minter::harvest_resources`].
+///
+/// # Reentrancy
+/// Runs under the global reentrancy guard (Issue #472): every check and state
+/// effect completes while the lock is held, following checks-effects-
+/// interactions, so a nested call into any guarded entry point while this one
+/// is in flight is rejected with a `Reentrancy` error.
 pub fn harvest_and_list(
+    env: &Env,
+    player: &Address,
+    ship_id: u64,
+    layout: &crate::nebula_explorer::NebulaLayout,
+    resource: &Symbol,
+    min_price: i128,
+) -> Result<(HarvestResult, DexOffer), HarvestError> {
+    with_guard(env, || {
+        harvest_and_list_unguarded(env, player, ship_id, layout, resource, min_price)
+    })
+}
+
+/// Unguarded body of [`harvest_and_list`]; callers must already hold the
+/// reentrancy lock (e.g. another guarded entry point composing it).
+fn harvest_and_list_unguarded(
     env: &Env,
     player: &Address,
     ship_id: u64,
@@ -55,7 +79,9 @@ pub fn harvest_and_list(
         return Err(HarvestError::DexFailure);
     }
 
-    let harvest_result = harvest_resources(env, ship_id, layout)?;
+    // Composes the unguarded harvest: this function already holds the lock,
+    // and re-acquiring it would reject our own nested call.
+    let harvest_result = harvest_resources_unguarded(env, ship_id, layout)?;
 
     let mut listed_amount: u32 = 0;
     for i in 0..harvest_result.resources.len() {
@@ -123,7 +149,23 @@ pub fn harvest_and_list(
 /// Without the `seller` check below this would be a fund-theft bug: the escrow
 /// refund is credited to `caller`, so any address could cancel any live offer
 /// and collect the seller's escrowed units.
+///
+/// # Reentrancy
+/// Runs under the global reentrancy guard (Issue #472): every check and state
+/// effect completes while the lock is held, following checks-effects-
+/// interactions, so a nested call into any guarded entry point while this one
+/// is in flight is rejected with a `Reentrancy` error.
 pub fn cancel_listing(env: &Env, owner: &Address, offer_id: u64) -> Result<DexOffer, HarvestError> {
+    with_guard(env, || cancel_listing_unguarded(env, owner, offer_id))
+}
+
+/// Unguarded body of [`cancel_listing`]; callers must already hold the
+/// reentrancy lock (e.g. another guarded entry point composing it).
+fn cancel_listing_unguarded(
+    env: &Env,
+    owner: &Address,
+    offer_id: u64,
+) -> Result<DexOffer, HarvestError> {
     owner.require_auth();
 
     let mut offer: DexOffer = get_dex_offer(env, offer_id).ok_or(HarvestError::DexFailure)?;

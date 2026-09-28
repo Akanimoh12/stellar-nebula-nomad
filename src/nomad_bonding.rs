@@ -244,7 +244,26 @@ pub fn accept_bond(env: &Env, partner: &Address, bond_id: u64) -> Result<NomadBo
 /// * [`BondError::BondNotFound`] if the bond does not exist.
 /// * [`BondError::BondNotActive`] if the bond is not `Active`.
 /// * [`BondError::NotBondMember`] if the caller is not part of the bond.
+///
+/// # Reentrancy
+/// Runs under the global reentrancy guard (Issue #472): every check and state
+/// effect completes while the lock is held, following checks-effects-
+/// interactions, so a nested call into any guarded entry point while this one
+/// is in flight is rejected with a `Reentrancy` error.
 pub fn delegate_yield(
+    env: &Env,
+    delegator: &Address,
+    bond_id: u64,
+    percentage: u32,
+) -> Result<YieldDelegation, BondError> {
+    with_guard(env, || {
+        delegate_yield_unguarded(env, delegator, bond_id, percentage)
+    })
+}
+
+/// Unguarded body of [`delegate_yield`]; callers must already hold the
+/// reentrancy lock (e.g. another guarded entry point composing it).
+fn delegate_yield_unguarded(
     env: &Env,
     delegator: &Address,
     bond_id: u64,
@@ -432,7 +451,23 @@ pub fn claim_yield(env: &Env, claimer: &Address, bond_id: u64) -> Result<u64, Bo
 /// * [`BondError::BondNotFound`] if the bond does not exist.
 /// * [`BondError::AlreadyDissolved`] if the bond is already dissolved.
 /// * [`BondError::NotBondParty`] if the caller is not a bonded party.
+///
+/// # Reentrancy
+/// Runs under the global reentrancy guard (Issue #472): every check and state
+/// effect completes while the lock is held, following checks-effects-
+/// interactions, so a nested call into any guarded entry point while this one
+/// is in flight is rejected with a `Reentrancy` error.
 pub fn dissolve_bond(env: &Env, caller: &Address, bond_id: u64) -> Result<NomadBond, BondError> {
+    with_guard(env, || dissolve_bond_unguarded(env, caller, bond_id))
+}
+
+/// Unguarded body of [`dissolve_bond`]; callers must already hold the
+/// reentrancy lock (e.g. another guarded entry point composing it).
+fn dissolve_bond_unguarded(
+    env: &Env,
+    caller: &Address,
+    bond_id: u64,
+) -> Result<NomadBond, BondError> {
     caller.require_auth();
 
     let mut bond: NomadBond = env
@@ -730,6 +765,51 @@ mod tests {
             let amount = claim_yield(&env, &partner, bond.bond_id)
                 .expect("claim_yield should succeed once unlocked");
             assert_eq!(amount, 500);
+        });
+    }
+
+    #[test]
+    fn test_bond_modifications_rejected_while_guard_held() {
+        // Delegation and dissolution are blocked while a guarded call (e.g. a
+        // yield claim) is in flight, so a callback cannot dissolve or re-point
+        // a bond mid-transfer (Issue #472).
+        let (env, contract_id) = make_env();
+        let initiator = Address::generate(&env);
+        let partner = Address::generate(&env);
+
+        env.mock_all_auths();
+
+        let bond_id = env.as_contract(&contract_id, || {
+            let bond =
+                create_bond(&env, &initiator, 1, &partner).expect("create_bond should succeed");
+            accept_bond(&env, &partner, bond.bond_id).expect("accept_bond should succeed");
+            bond.bond_id
+        });
+
+        env.as_contract(&contract_id, || {
+            crate::reentrancy_guard::acquire(&env).expect("lock should be free");
+            assert_eq!(
+                delegate_yield(&env, &initiator, bond_id, 50),
+                Err(BondError::Reentrancy)
+            );
+            assert_eq!(
+                dissolve_bond(&env, &initiator, bond_id),
+                Err(BondError::Reentrancy)
+            );
+            crate::reentrancy_guard::release(&env);
+
+            // Neither rejected call changed bond state.
+            assert_eq!(get_bond(&env, bond_id).unwrap().status, BondStatus::Active);
+            assert_eq!(
+                get_yield_delegation(&env, bond_id),
+                Err(BondError::NoDelegation)
+            );
+        });
+
+        env.as_contract(&contract_id, || {
+            let bond = dissolve_bond(&env, &initiator, bond_id)
+                .expect("dissolve_bond should succeed once unlocked");
+            assert_eq!(bond.status, BondStatus::Dissolved);
         });
     }
 

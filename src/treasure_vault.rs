@@ -1,5 +1,7 @@
 use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Env};
 
+use crate::reentrancy_guard::{with_guard, ReentrancyError};
+
 /// Default minimum lock duration: 7 days in seconds.
 pub const DEFAULT_MIN_LOCK_DURATION: u64 = 604_800;
 
@@ -34,6 +36,8 @@ pub enum VaultError {
     InvalidAmount = 5,
     /// A checked arithmetic operation overflowed (Issue #239).
     ArithmeticOverflow = 6,
+    /// A guarded section was re-entered (Issue #472).
+    Reentrancy = 7,
 }
 
 impl crate::error_standard::StandardContractError for VaultError {
@@ -46,6 +50,7 @@ impl crate::error_standard::StandardContractError for VaultError {
             Self::AlreadyClaimed => (ErrorKind::Conflict, false),
             Self::InvalidAmount => (ErrorKind::Validation, false),
             Self::ArithmeticOverflow => (ErrorKind::ResourceLimit, false),
+            Self::Reentrancy => (ErrorKind::Conflict, false),
         };
         crate::error_standard::ErrorDescriptor {
             module: "treasure_vault",
@@ -53,6 +58,12 @@ impl crate::error_standard::StandardContractError for VaultError {
             kind,
             retryable,
         }
+    }
+}
+
+impl From<ReentrancyError> for VaultError {
+    fn from(_: ReentrancyError) -> Self {
+        VaultError::Reentrancy
     }
 }
 
@@ -99,7 +110,26 @@ fn get_min_lock_duration(env: &Env) -> u64 {
 /// The vault locks the specified `amount` until `lock_until`, which is
 /// calculated as the current timestamp plus the minimum lock duration.
 /// A bonus multiplier is applied at claim time.
+///
+/// # Reentrancy
+/// Runs under the global reentrancy guard (Issue #472): every check and state
+/// effect completes while the lock is held, following checks-effects-
+/// interactions, so a nested call into any guarded entry point while this one
+/// is in flight is rejected with a `Reentrancy` error.
 pub fn deposit_treasure(
+    env: &Env,
+    owner: &Address,
+    ship_id: u64,
+    amount: u64,
+) -> Result<TreasureVault, VaultError> {
+    with_guard(env, || {
+        deposit_treasure_unguarded(env, owner, ship_id, amount)
+    })
+}
+
+/// Unguarded body of [`deposit_treasure`]; callers must already hold the
+/// reentrancy lock (e.g. another guarded entry point composing it).
+fn deposit_treasure_unguarded(
     env: &Env,
     owner: &Address,
     ship_id: u64,
@@ -144,7 +174,19 @@ pub fn deposit_treasure(
 ///
 /// Returns the original amount plus bonus yield.
 /// The bonus is calculated as: `amount * bonus_multiplier / 10_000`.
+///
+/// # Reentrancy
+/// Runs under the global reentrancy guard (Issue #472): every check and state
+/// effect completes while the lock is held, following checks-effects-
+/// interactions, so a nested call into any guarded entry point while this one
+/// is in flight is rejected with a `Reentrancy` error.
 pub fn claim_treasure(env: &Env, owner: &Address, vault_id: u64) -> Result<u64, VaultError> {
+    with_guard(env, || claim_treasure_unguarded(env, owner, vault_id))
+}
+
+/// Unguarded body of [`claim_treasure`]; callers must already hold the
+/// reentrancy lock (e.g. another guarded entry point composing it).
+fn claim_treasure_unguarded(env: &Env, owner: &Address, vault_id: u64) -> Result<u64, VaultError> {
     ensure_auth!(owner);
 
     let mut vault: TreasureVault = env
@@ -243,6 +285,49 @@ mod tests {
             let vault = deposit_treasure(&env, &owner, 1, 500).unwrap();
             let result = claim_treasure(&env, &owner, vault.vault_id);
             assert_eq!(result, Err(VaultError::StillLocked));
+        });
+    }
+
+    #[test]
+    fn test_vault_ops_rejected_while_guard_held() {
+        // A re-entrant claim must not pay out twice or observe a vault whose
+        // `claimed` flag has not yet been written (Issue #472).
+        use soroban_sdk::testutils::Ledger as _;
+
+        let (env, contract_id) = make_env();
+        let owner = Address::generate(&env);
+
+        let vault_id = env.as_contract(&contract_id, || {
+            deposit_treasure(&env, &owner, 1, 500).unwrap().vault_id
+        });
+        // Past the lock period, so only the guard can reject the claim.
+        env.ledger()
+            .with_mut(|l| l.timestamp += DEFAULT_MIN_LOCK_DURATION);
+
+        env.as_contract(&contract_id, || {
+            crate::reentrancy_guard::acquire(&env).expect("lock should be free");
+            assert_eq!(
+                deposit_treasure(&env, &owner, 1, 10).map(|v| v.vault_id),
+                Err(VaultError::Reentrancy)
+            );
+            assert_eq!(
+                claim_treasure(&env, &owner, vault_id),
+                Err(VaultError::Reentrancy)
+            );
+            crate::reentrancy_guard::release(&env);
+            assert!(!get_vault(&env, vault_id).unwrap().claimed);
+        });
+
+        env.as_contract(&contract_id, || {
+            assert_eq!(claim_treasure(&env, &owner, vault_id), Ok(550));
+        });
+
+        // Effects were committed before returning: a replay is rejected.
+        env.as_contract(&contract_id, || {
+            assert_eq!(
+                claim_treasure(&env, &owner, vault_id),
+                Err(VaultError::AlreadyClaimed)
+            );
         });
     }
 
