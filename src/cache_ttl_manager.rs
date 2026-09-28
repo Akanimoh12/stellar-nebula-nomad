@@ -172,8 +172,13 @@ pub fn get_cached_with_ttl(
         Some(entry) => {
             let current_time = env.ledger().timestamp();
             let age = current_time.saturating_sub(entry.cached_at);
+            let invalidated: bool = env
+                .storage()
+                .instance()
+                .get(&CacheKey::IsStale(namespace.clone(), key.clone()))
+                .unwrap_or(false);
 
-            if age > entry.ttl_seconds {
+            if invalidated || !entry.is_valid || age > entry.ttl_seconds {
                 // Mark as stale and emit event.
                 env.storage()
                     .instance()
@@ -204,7 +209,12 @@ pub fn is_cache_valid(env: &Env, namespace: Symbol, key: Symbol) -> bool {
         Some(entry) => {
             let current_time = env.ledger().timestamp();
             let age = current_time.saturating_sub(entry.cached_at);
-            age <= entry.ttl_seconds
+            let invalidated: bool = env
+                .storage()
+                .instance()
+                .get(&CacheKey::IsStale(namespace, key))
+                .unwrap_or(false);
+            !invalidated && entry.is_valid && age <= entry.ttl_seconds
         }
     }
 }
@@ -245,7 +255,7 @@ pub fn invalidate_cache_entry(
         .set(&CacheKey::IsStale(namespace.clone(), key.clone()), &true);
 
     env.events().publish(
-        (symbol_short!("cache"), symbol_short!("invalid")),
+        (symbol_short!("cache"), symbol_short!("inv")),
         (namespace, key, reason, env.ledger().timestamp()),
     );
 }
@@ -261,7 +271,7 @@ pub fn invalidate_namespace(
         .set(&CacheKey::LastInvalidation(namespace.clone()), &env.ledger().timestamp());
 
     env.events().publish(
-        (symbol_short!("cache"), symbol_short!("ns_invald")),
+        (symbol_short!("cache"), symbol_short!("ns_clr")),
         (namespace, reason, env.ledger().timestamp()),
     );
 }
@@ -310,7 +320,7 @@ pub fn configure_ttl(
         .set(&CacheKey::TtlConfig(namespace.clone()), &config);
 
     env.events().publish(
-        (symbol_short!("cache"), symbol_short!("config")),
+        (symbol_short!("cache"), symbol_short!("cfg")),
         (namespace, ttl_seconds, auto_refresh, env.ledger().timestamp()),
     );
 

@@ -118,13 +118,19 @@ pub enum AccessControlError {
     TimelockNotElapsed = 16,
     /// Invalid signer configuration.
     InvalidSignerConfig = 17,
+    /// Invalid role hierarchy (e.g. cycle or self-parenting).
+    InvalidRoleHierarchy = 18,
+    /// Operation not permitted outside emergency mode.
+    NotInEmergencyMode = 19,
+    /// Delegation expired or invalid.
+    InvalidDelegation = 20,
 }
 
 impl StandardContractError for AccessControlError {
     fn descriptor(self) -> ErrorDescriptor {
         use AccessControlError::*;
         let (kind, retryable) = match self {
-            AdminRequired | UnauthorizedRole | InsufficientApprovals => {
+            AdminRequired | UnauthorizedRole | InsufficientApprovals | NotInEmergencyMode => {
                 (ErrorKind::Authorization, false)
             }
             RoleNotFound | PermissionNotFound | MultiSigNotConfigured | ProposalNotFound => {
@@ -134,7 +140,7 @@ impl StandardContractError for AccessControlError {
                 (ErrorKind::Conflict, false)
             }
             BatchLimitExceeded => (ErrorKind::ResourceLimit, false),
-            InvalidExpiry | ProposalExpired | InvalidSignerConfig => {
+            InvalidExpiry | ProposalExpired | InvalidSignerConfig | InvalidRoleHierarchy | InvalidDelegation => {
                 (ErrorKind::Validation, false)
             }
             TimelockNotElapsed => (ErrorKind::Conflict, true),
@@ -184,6 +190,25 @@ pub enum AccessControlKey {
     ProposalCounter,
     /// List of all admin signers.
     AdminSigners,
+    /// Role inheritance: role -> parent role Symbol.
+    RoleParent(Symbol),
+    /// Emergency mode toggle.
+    EmergencyMode,
+    /// Emergency role flag: role Symbol -> bool.
+    EmergencyRole(Symbol),
+    /// Role delegation: (role Symbol, delegatee Address) -> DelegatedRoleRecord.
+    RoleDelegation(Symbol, Address),
+}
+
+/// Record of a delegated role assignment.
+#[derive(Clone, Debug, PartialEq)]
+#[contracttype]
+pub struct DelegatedRoleRecord {
+    pub delegator: Address,
+    pub delegatee: Address,
+    pub role: Symbol,
+    pub expiry_ledger: u32,
+    pub active: bool,
 }
 
 /// Record of a role membership, including expiry and revocation state.
@@ -353,6 +378,24 @@ fn register_known_role(env: &Env, role: &Symbol) {
         .set(&AccessControlKey::KnownRoles, &roles);
 }
 
+/// Fetch parent role in hierarchy
+pub fn get_role_parent(env: &Env, role: &Symbol) -> Option<Symbol> {
+    env.storage()
+        .persistent()
+        .get(&AccessControlKey::RoleParent(role.clone()))
+}
+
+/// Fetch delegation record
+fn get_delegation_record(
+    env: &Env,
+    role: &Symbol,
+    delegatee: &Address,
+) -> Option<DelegatedRoleRecord> {
+    env.storage()
+        .persistent()
+        .get(&AccessControlKey::RoleDelegation(role.clone(), delegatee.clone()))
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CORE ROLE & PERMISSION FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -380,19 +423,40 @@ pub fn has_role(env: &Env, role: &Symbol, address: &Address) -> bool {
         }
         return true;
     }
+
+    // Check active unexpired delegation
+    if let Some(delegation) = get_delegation_record(env, role, address) {
+        if delegation.active && env.ledger().sequence() < delegation.expiry_ledger {
+            return true;
+        }
+    }
+
     false
 }
 
-/// Check whether a role is permitted to perform an action.
+/// Check whether a role is permitted to perform an action, including inherited permissions.
 ///
 /// # Returns
-/// - `true` if the permission was granted.
+/// - `true` if the permission was granted directly or inherited from parent role.
 /// - `false` if the permission was never granted or was revoked.
 ///
 /// # Notes
 /// - This is a pure read operation; no storage mutations, no authentication required.
 pub fn has_permission(env: &Env, role: &Symbol, action: &Symbol) -> bool {
-    get_permission(env, role, action)
+    let mut current_role = role.clone();
+    let mut depth = 0;
+    while depth < 6 {
+        if get_permission(env, &current_role, action) {
+            return true;
+        }
+        if let Some(parent) = get_role_parent(env, &current_role) {
+            current_role = parent;
+            depth += 1;
+        } else {
+            break;
+        }
+    }
+    false
 }
 
 /// Grant a role to a single address, optionally expiring at a future ledger sequence.
@@ -569,6 +633,21 @@ pub fn check_permission(
     action: &Symbol,
 ) -> Result<(), AccessControlError> {
     let known_roles = get_known_roles(env);
+
+    // If emergency mode is active, check if caller holds any designated emergency role
+    if is_emergency_mode(env) {
+        for i in 0..known_roles.len() {
+            if let Some(role) = known_roles.get(i) {
+                if is_emergency_role(env, &role) && has_role(env, &role, caller) {
+                    env.events().publish(
+                        (symbol_short!("rbac"), symbol_short!("emrg_ok")),
+                        (caller.clone(), action.clone()),
+                    );
+                    return Ok(());
+                }
+            }
+        }
+    }
 
     // Iterate through all known roles
     for i in 0..known_roles.len() {
@@ -784,11 +863,11 @@ pub fn init_roles(env: &Env, admin: Address) -> Result<(), AccessControlError> {
 /// # Returns
 /// - Always `Err(NotImplemented)` until DAO integration is implemented.
 pub fn propose_role_change(
-    env: &Env,
+    _env: &Env,
     proposer: Address,
-    role: Symbol,
-    grantee: Address,
-    action_type: Symbol,
+    _role: Symbol,
+    _grantee: Address,
+    _action_type: Symbol,
 ) -> Result<u64, AccessControlError> {
     // Stub: revert immediately
     proposer.require_auth();
@@ -943,7 +1022,7 @@ pub fn approve_proposal(
 ) -> Result<(), AccessControlError> {
     approver.require_auth();
 
-    let config: MultiSigConfig = env
+    let _config: MultiSigConfig = env
         .storage()
         .persistent()
         .get(&AccessControlKey::MultiSigConfig)
@@ -1123,6 +1202,189 @@ fn next_proposal_id(env: &Env) -> u64 {
     next
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// HIERARCHY, EMERGENCY ROLES, DELEGATION & TEMPLATES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Set parent role for role hierarchy inheritance.
+pub fn set_role_parent(
+    env: &Env,
+    caller: Address,
+    role: Symbol,
+    parent: Symbol,
+) -> Result<(), AccessControlError> {
+    caller.require_auth();
+    let admin = get_admin(env).ok_or(AccessControlError::InitializationFailed)?;
+    if caller != admin {
+        return Err(AccessControlError::AdminRequired);
+    }
+    if role == parent {
+        return Err(AccessControlError::InvalidRoleHierarchy);
+    }
+    register_known_role(env, &role);
+    register_known_role(env, &parent);
+
+    env.storage()
+        .persistent()
+        .set(&AccessControlKey::RoleParent(role.clone()), &parent);
+
+    env.events().publish(
+        (symbol_short!("rbac"), symbol_short!("parent")),
+        (role, parent),
+    );
+    Ok(())
+}
+
+/// Set emergency mode globally.
+pub fn set_emergency_mode(
+    env: &Env,
+    caller: Address,
+    enabled: bool,
+) -> Result<(), AccessControlError> {
+    caller.require_auth();
+    let admin = get_admin(env).ok_or(AccessControlError::InitializationFailed)?;
+    if caller != admin {
+        return Err(AccessControlError::AdminRequired);
+    }
+    env.storage()
+        .persistent()
+        .set(&AccessControlKey::EmergencyMode, &enabled);
+
+    env.events().publish(
+        (symbol_short!("rbac"), symbol_short!("emrg_mode")),
+        enabled,
+    );
+    Ok(())
+}
+
+/// Check whether emergency mode is active.
+pub fn is_emergency_mode(env: &Env) -> bool {
+    env.storage()
+        .persistent()
+        .get(&AccessControlKey::EmergencyMode)
+        .unwrap_or(false)
+}
+
+/// Designate or undesignate an emergency role.
+pub fn set_emergency_role(
+    env: &Env,
+    caller: Address,
+    role: Symbol,
+    is_emergency: bool,
+) -> Result<(), AccessControlError> {
+    caller.require_auth();
+    let admin = get_admin(env).ok_or(AccessControlError::InitializationFailed)?;
+    if caller != admin {
+        return Err(AccessControlError::AdminRequired);
+    }
+    register_known_role(env, &role);
+    env.storage()
+        .persistent()
+        .set(&AccessControlKey::EmergencyRole(role), &is_emergency);
+
+    Ok(())
+}
+
+/// Check whether a role is an emergency role.
+pub fn is_emergency_role(env: &Env, role: &Symbol) -> bool {
+    env.storage()
+        .persistent()
+        .get(&AccessControlKey::EmergencyRole(role.clone()))
+        .unwrap_or(false)
+}
+
+/// Delegate role permissions to another address until expiry_ledger.
+pub fn delegate_role(
+    env: &Env,
+    delegator: Address,
+    delegatee: Address,
+    role: Symbol,
+    expiry_ledger: u32,
+) -> Result<(), AccessControlError> {
+    delegator.require_auth();
+    if !has_role(env, &role, &delegator) {
+        return Err(AccessControlError::UnauthorizedRole);
+    }
+    if expiry_ledger <= env.ledger().sequence() {
+        return Err(AccessControlError::InvalidExpiry);
+    }
+
+    let record = DelegatedRoleRecord {
+        delegator: delegator.clone(),
+        delegatee: delegatee.clone(),
+        role: role.clone(),
+        expiry_ledger,
+        active: true,
+    };
+
+    env.storage()
+        .persistent()
+        .set(&AccessControlKey::RoleDelegation(role.clone(), delegatee.clone()), &record);
+
+    env.events().publish(
+        (symbol_short!("rbac"), symbol_short!("delegate")),
+        (delegator, delegatee, role, expiry_ledger),
+    );
+    Ok(())
+}
+
+/// Revoke a role delegation.
+pub fn revoke_delegation(
+    env: &Env,
+    delegator: Address,
+    delegatee: Address,
+    role: Symbol,
+) -> Result<(), AccessControlError> {
+    delegator.require_auth();
+    env.storage()
+        .persistent()
+        .remove(&AccessControlKey::RoleDelegation(role.clone(), delegatee.clone()));
+
+    env.events().publish(
+        (symbol_short!("rbac"), symbol_short!("rev_del")),
+        (delegator, delegatee, role),
+    );
+    Ok(())
+}
+
+/// Initialize role templates (admin -> operator -> readonly).
+pub fn init_role_templates(env: &Env, admin: Address) -> Result<(), AccessControlError> {
+    admin.require_auth();
+    let current_admin = get_admin(env).ok_or(AccessControlError::InitializationFailed)?;
+    if admin != current_admin {
+        return Err(AccessControlError::AdminRequired);
+    }
+
+    let readonly = symbol_short!("readonly");
+    let operator = symbol_short!("operator");
+    let admin_r = admin_role();
+
+    register_known_role(env, &readonly);
+    register_known_role(env, &operator);
+    register_known_role(env, &admin_r);
+
+    // Readonly permissions
+    set_permission(env, &readonly, &symbol_short!("read"));
+    set_permission(env, &readonly, &symbol_short!("query"));
+
+    // Operator permissions
+    set_permission(env, &operator, &symbol_short!("operate"));
+    set_permission(env, &operator, &symbol_short!("pause"));
+
+    // Admin permissions
+    set_permission(env, &admin_r, &symbol_short!("admin"));
+    set_permission(env, &admin_r, &symbol_short!("manage"));
+
+    // Hierarchy: Admin -> Operator -> Readonly
+    env.storage()
+        .persistent()
+        .set(&AccessControlKey::RoleParent(admin_r), &operator);
+    env.storage()
+        .persistent()
+        .set(&AccessControlKey::RoleParent(operator), &readonly);
+
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
@@ -1501,5 +1763,98 @@ mod tests {
 
         let result = grant_role(&env, admin, nomad_role(), player, None);
         assert_eq!(result, Err(AccessControlError::AdminRequired));
+    }
+
+    // ── Role Hierarchy & Inheritance Tests ──
+
+    #[test]
+    fn test_role_hierarchy_permission_inheritance() {
+        let (env, admin) = setup_env();
+        init_roles(&env, admin.clone()).unwrap();
+
+        let officer_role = symbol_short!("officer");
+        let captain_role = symbol_short!("captain");
+        let pilot_address = Address::generate(&env);
+
+        grant_permission(&env, admin.clone(), officer_role.clone(), symbol_short!("steer")).unwrap();
+        // captain inherits from officer
+        set_role_parent(&env, admin.clone(), captain_role.clone(), officer_role.clone()).unwrap();
+
+        grant_role(&env, admin.clone(), captain_role.clone(), pilot_address.clone(), None).unwrap();
+
+        // pilot has captain role, which inherits "steer" from officer
+        assert!(has_permission(&env, &captain_role, &symbol_short!("steer")));
+        assert!(check_permission(&env, &pilot_address, &symbol_short!("steer")).is_ok());
+    }
+
+    #[test]
+    fn test_role_hierarchy_self_parenting_rejected() {
+        let (env, admin) = setup_env();
+        init_roles(&env, admin.clone()).unwrap();
+        let role = symbol_short!("admin");
+        let res = set_role_parent(&env, admin, role.clone(), role);
+        assert_eq!(res, Err(AccessControlError::InvalidRoleHierarchy));
+    }
+
+    // ── Emergency Role Tests ──
+
+    #[test]
+    fn test_emergency_role_bypass() {
+        let (env, admin) = setup_env();
+        init_roles(&env, admin.clone()).unwrap();
+
+        let emergency_responder = Address::generate(&env);
+        let responder_role = symbol_short!("responder");
+
+        grant_role(&env, admin.clone(), responder_role.clone(), emergency_responder.clone(), None).unwrap();
+        set_emergency_role(&env, admin.clone(), responder_role.clone(), true).unwrap();
+
+        // Outside emergency mode, responder cannot execute unguarded actions
+        let res = check_permission(&env, &emergency_responder, &symbol_short!("evacuate"));
+        assert!(res.is_err());
+
+        // Enable emergency mode
+        set_emergency_mode(&env, admin, true).unwrap();
+        assert!(is_emergency_mode(&env));
+
+        // Now emergency responder bypasses restriction
+        let res = check_permission(&env, &emergency_responder, &symbol_short!("evacuate"));
+        assert!(res.is_ok());
+    }
+
+    // ── Role Delegation Tests ──
+
+    #[test]
+    fn test_role_delegation_and_expiry() {
+        let (env, admin) = setup_env();
+        init_roles(&env, admin.clone()).unwrap();
+
+        let delegator = Address::generate(&env);
+        let delegatee = Address::generate(&env);
+        let role = nomad_role();
+
+        grant_role(&env, admin, role.clone(), delegator.clone(), None).unwrap();
+
+        let expiry_seq = env.ledger().sequence() + 10;
+        delegate_role(&env, delegator.clone(), delegatee.clone(), role.clone(), expiry_seq).unwrap();
+
+        assert!(has_role(&env, &role, &delegatee));
+
+        // Advance ledger past expiry
+        advance_ledger(&env, 15);
+        assert!(!has_role(&env, &role, &delegatee));
+    }
+
+    #[test]
+    fn test_init_role_templates() {
+        let (env, admin) = setup_env();
+        init_roles(&env, admin.clone()).unwrap();
+
+        init_role_templates(&env, admin).unwrap();
+
+        let admin_r = admin_role();
+        // admin inherits operator permissions ("operate", "pause") and readonly ("read", "query")
+        assert!(has_permission(&env, &admin_r, &symbol_short!("operate")));
+        assert!(has_permission(&env, &admin_r, &symbol_short!("read")));
     }
 }

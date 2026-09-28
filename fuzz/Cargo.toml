@@ -1,0 +1,31 @@
+[package]
+name = "stellar-nebula-nomad-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+soroban-sdk = { version = "22.0", features = ["testutils"] }
+
+[dependencies.stellar-nebula-nomad]
+path = ".."
+
+[workspace]
+
+[[bin]]
+name = "fuzz_nebula_layout"
+path = "fuzz_targets/fuzz_nebula_layout.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_ship_mint"
+path = "fuzz_targets/fuzz_ship_mint.rs"
+test = false
+doc = false
+bench = false

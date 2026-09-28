@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, Env, String};
+use soroban_sdk::{contracterror, BytesN, Env, String};
 
 /// Maximum length for short string fields (names, aliases).
 pub const MAX_NAME_LENGTH: u32 = 64;
@@ -6,6 +6,8 @@ pub const MAX_NAME_LENGTH: u32 = 64;
 pub const MAX_DESCRIPTION_LENGTH: u32 = 512;
 /// Maximum length for metadata URI fields.
 pub const MAX_METADATA_URI_LENGTH: u32 = 256;
+/// Highest valid nebula region id (inclusive). Region 0 is reserved.
+pub const MAX_REGION_ID: u32 = 1_000_000;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -21,6 +23,12 @@ pub enum ValidationError {
     InvalidCharacters = 83,
     /// IPFS CID format is invalid.
     InvalidCidFormat = 84,
+    /// Region id is zero or above `MAX_REGION_ID`.
+    InvalidRegionId = 85,
+    /// Seed is a degenerate pattern (every byte identical, e.g. all zeros).
+    InvalidSeed = 86,
+    /// Arithmetic on region/seed inputs would overflow or underflow.
+    ArithmeticOverflow = 87,
 }
 
 impl crate::error_standard::StandardContractError for ValidationError {
@@ -31,7 +39,10 @@ impl crate::error_standard::StandardContractError for ValidationError {
             Self::EmptyString
             | Self::InvalidUtf8
             | Self::InvalidCharacters
-            | Self::InvalidCidFormat => (ErrorKind::Validation, false),
+            | Self::InvalidCidFormat
+            | Self::InvalidRegionId
+            | Self::InvalidSeed => (ErrorKind::Validation, false),
+            Self::ArithmeticOverflow => (ErrorKind::ResourceLimit, false),
         };
         crate::error_standard::ErrorDescriptor {
             module: "input_validation",
@@ -126,6 +137,37 @@ pub fn validate_cid(_env: &Env, cid: &String) -> Result<(), ValidationError> {
     }
 
     Err(ValidationError::InvalidCidFormat)
+}
+
+/// Validate a nebula region id: must be in `1..=MAX_REGION_ID`.
+pub fn validate_region_id(region_id: u32) -> Result<(), ValidationError> {
+    if region_id == 0 || region_id > MAX_REGION_ID {
+        return Err(ValidationError::InvalidRegionId);
+    }
+    Ok(())
+}
+
+/// Validate a 32-byte generation seed.
+///
+/// Rejects degenerate seeds where every byte is identical (all `0x00`,
+/// all `0xFF`, ...), which give trivially predictable layouts.
+pub fn validate_seed(seed: &BytesN<32>) -> Result<(), ValidationError> {
+    let bytes = seed.to_array();
+    if bytes.iter().all(|b| *b == bytes[0]) {
+        return Err(ValidationError::InvalidSeed);
+    }
+    Ok(())
+}
+
+/// Offset a region id by `delta`, rejecting overflow/underflow and results
+/// outside the valid region range.
+pub fn checked_region_offset(region_id: u32, delta: i64) -> Result<u32, ValidationError> {
+    let next = i64::from(region_id)
+        .checked_add(delta)
+        .ok_or(ValidationError::ArithmeticOverflow)?;
+    let next = u32::try_from(next).map_err(|_| ValidationError::ArithmeticOverflow)?;
+    validate_region_id(next)?;
+    Ok(next)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -232,5 +274,50 @@ mod tests {
         let env = make_env();
         let cid = String::from_str(&env, "");
         assert_eq!(validate_cid(&env, &cid), Err(ValidationError::EmptyString));
+    }
+
+    #[test]
+    fn test_region_id_bounds() {
+        assert_eq!(validate_region_id(1), Ok(()));
+        assert_eq!(validate_region_id(MAX_REGION_ID), Ok(()));
+        assert_eq!(validate_region_id(0), Err(ValidationError::InvalidRegionId));
+        assert_eq!(
+            validate_region_id(MAX_REGION_ID + 1),
+            Err(ValidationError::InvalidRegionId)
+        );
+        assert_eq!(
+            validate_region_id(u32::MAX),
+            Err(ValidationError::InvalidRegionId)
+        );
+    }
+
+    #[test]
+    fn test_seed_patterns() {
+        let env = make_env();
+        let zero = BytesN::from_array(&env, &[0u8; 32]);
+        let ones = BytesN::from_array(&env, &[0xFFu8; 32]);
+        let mut good = [7u8; 32];
+        good[31] = 8;
+        assert_eq!(validate_seed(&zero), Err(ValidationError::InvalidSeed));
+        assert_eq!(validate_seed(&ones), Err(ValidationError::InvalidSeed));
+        assert_eq!(validate_seed(&BytesN::from_array(&env, &good)), Ok(()));
+    }
+
+    #[test]
+    fn test_checked_region_offset() {
+        assert_eq!(checked_region_offset(10, 5), Ok(15));
+        assert_eq!(checked_region_offset(10, -9), Ok(1));
+        assert_eq!(
+            checked_region_offset(1, -1),
+            Err(ValidationError::InvalidRegionId)
+        );
+        assert_eq!(
+            checked_region_offset(1, -2),
+            Err(ValidationError::ArithmeticOverflow)
+        );
+        assert_eq!(
+            checked_region_offset(u32::MAX, i64::MAX),
+            Err(ValidationError::ArithmeticOverflow)
+        );
     }
 }

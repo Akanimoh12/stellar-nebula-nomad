@@ -64,6 +64,26 @@ harness = false
 
 # Fuzz / property-based tests (require --features fuzz for some)
 [[test]]
+name = "chaos_network_failures"
+path = "tests/chaos/network_failures.rs"
+
+[[test]]
+name = "chaos_storage_failures"
+path = "tests/chaos/storage_failures.rs"
+
+[[test]]
+name = "chaos_high_load"
+path = "tests/chaos/high_load.rs"
+
+[[test]]
+name = "chaos_byzantine_attacks"
+path = "tests/chaos/byzantine_attacks.rs"
+
+[[test]]
+name = "chaos_state_corruption"
+path = "tests/chaos/state_corruption.rs"
+
+[[test]]
 name = "fuzz"
 path = "tests/fuzz/fuzz.rs"
 
@@ -79,6 +99,10 @@ path = "tests/fuzz/fuzz_trading.rs"
 name = "fuzz_yield"
 path = "tests/fuzz/fuzz_yield.rs"
 
+[[test]]
+name = "fuzz_comprehensive"
+path = "tests/fuzz/fuzz_comprehensive.rs"
+
 # Economy & DeFi mechanics: staking, yield, DEX, sponsorship, batching
 [[test]]
 name = "test_batch_processor"
@@ -87,6 +111,10 @@ path = "tests/economy/test_batch_processor.rs"
 [[test]]
 name = "test_dex_integration"
 path = "tests/economy/test_dex_integration.rs"
+
+[[test]]
+name = "test_dynamic_pricing"
+path = "tests/economy/test_dynamic_pricing.rs"
 
 [[test]]
 name = "test_fractional_resources"
@@ -169,6 +197,10 @@ name = "test_seasonal_events"
 path = "tests/gameplay/test_seasonal_events.rs"
 
 [[test]]
+name = "test_ship_repair"
+path = "tests/gameplay/test_ship_repair.rs"
+
+[[test]]
 name = "test_ship_upgrade"
 path = "tests/gameplay/test_ship_upgrade.rs"
 
@@ -246,6 +278,11 @@ path = "tests/misc/test_new_features_combined.rs"
 name = "test_new_modules"
 path = "tests/misc/test_new_modules.rs"
 
+# symbol_short! 9-char limit guard (Issues #392, #393)
+[[test]]
+name = "test_symbol_lengths"
+path = "tests/misc/test_symbol_lengths.rs"
+
 # End-to-end integration test suite (Issue #427)
 [[test]]
 name = "test_e2e_flows"
@@ -256,19 +293,53 @@ path = "tests/integration/test_e2e_flows.rs"
 name = "test_nebula_gen_properties"
 path = "tests/property_tests/nebula_gen_tests.rs"
 
+# Property-based tests for core modules (Issue #477)
+[[test]]
+name = "nebula_gen_properties"
+path = "tests/property/nebula_gen_properties.rs"
+
+[[test]]
+name = "resource_minter_properties"
+path = "tests/property/resource_minter_properties.rs"
+
+[[test]]
+name = "economic_properties"
+path = "tests/property/economic_properties.rs"
+
+# End-to-end cross-contract integration test suites (Issue #479)
+[[test]]
+name = "player_journey_test"
+path = "tests/integration/player_journey_test.rs"
+
+[[test]]
+name = "guild_operations_test"
+path = "tests/integration/guild_operations_test.rs"
+
+[[test]]
+name = "economic_cycle_test"
+path = "tests/integration/economic_cycle_test.rs"
+
+[[test]]
+name = "governance_flow_test"
+path = "tests/integration/governance_flow_test.rs"
+
+[[test]]
+name = "emergency_scenarios_test"
+path = "tests/integration/emergency_scenarios_test.rs"
+
 [features]
 # Enable advanced fuzz / property-based testing helpers.
 # Usage: cargo test --features fuzz
 fuzz = ["soroban-sdk/testutils"]
 
 [dependencies]
-soroban-sdk = "22.0"
+soroban-sdk = "28.0"
 # no_std-compatible math (pow/round/etc.) for ELO and other floating-point
 # calculations that plain core::f64 doesn't provide without std.
 libm = "0.2"
 
 [dev-dependencies]
-soroban-sdk = { version = "22.0", features = ["testutils"] }
+soroban-sdk = { version = "28.0", features = ["testutils"] }
 proptest = "=1.6.0"
 rand = "=0.10.3"
 

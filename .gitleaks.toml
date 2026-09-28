@@ -1,0 +1,11 @@
+title = "gitleaks config"
+
+[allowlist]
+description = "Allowlist test vectors and mock secrets in tests"
+paths = [
+  '''services/relayer/src/startup\.test\.ts''',
+  '''tests/.*''',
+]
+regexes = [
+  '''SBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA''',
+]
