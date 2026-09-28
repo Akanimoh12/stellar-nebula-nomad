@@ -341,7 +341,7 @@ libm = "0.2"
 [dev-dependencies]
 soroban-sdk = { version = "28.0", features = ["testutils"] }
 proptest = "=1.6.0"
-rand = "=0.8.5"
+rand = "=0.10.3"
 
 
 
