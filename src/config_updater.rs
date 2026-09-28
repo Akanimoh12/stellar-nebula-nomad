@@ -482,6 +482,28 @@ mod tests {
         assert_eq!(err, ConfigError::Unauthorized);
     }
 
+    #[test]
+    fn test_non_admin_cannot_remove_signer() {
+        let env = Env::default();
+        let (_, signer, _) = setup(&env);
+        let outsider = Address::generate(&env);
+
+        let err = remove_signer(&env, &outsider, &signer).unwrap_err();
+        assert_eq!(err, ConfigError::Unauthorized);
+        assert!(is_signer(&env, &signer));
+    }
+
+    #[test]
+    fn test_removed_signer_cannot_propose() {
+        let env = Env::default();
+        let (admin, signer, _) = setup(&env);
+        let p = param(&env, "harvest_cap");
+
+        remove_signer(&env, &admin, &signer).unwrap();
+        let err = update_config(&env, &signer, p, make_value(&env, 11)).unwrap_err();
+        assert_eq!(err, ConfigError::Unauthorized);
+    }
+
     // ── Propose (update_config) ──────────────────────────────────────────────
 
     #[test]
