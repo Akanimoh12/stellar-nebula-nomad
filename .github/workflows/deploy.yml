@@ -148,7 +148,7 @@ jobs:
           retention-days: 90
 
       - name: Post deployment summary
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         if: always()
         with:
           script: |
