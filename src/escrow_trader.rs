@@ -271,7 +271,20 @@ pub fn complete_escrow(env: &Env, escrow_id: u64) -> Result<EscrowResult, Escrow
     })
 }
 
+/// Cancel a pending escrow. Either participant may cancel before completion.
+///
+/// # Reentrancy
+/// Runs under the global reentrancy guard (Issue #472): every check and state
+/// effect completes while the lock is held, following checks-effects-
+/// interactions, so a nested call into any guarded entry point while this one
+/// is in flight is rejected with a `Reentrancy` error.
 pub fn cancel_escrow(env: &Env, escrow_id: u64, trader: Address) -> Result<(), EscrowError> {
+    with_guard(env, || cancel_escrow_unguarded(env, escrow_id, trader))
+}
+
+/// Unguarded body of [`cancel_escrow`]; callers must already hold the
+/// reentrancy lock (e.g. another guarded entry point composing it).
+fn cancel_escrow_unguarded(env: &Env, escrow_id: u64, trader: Address) -> Result<(), EscrowError> {
     trader.require_auth();
 
     let escrow = env
@@ -375,6 +388,33 @@ mod tests {
             // Once released, completion succeeds normally.
             let result = complete_escrow(&env, escrow_id).expect("complete_escrow should succeed");
             assert!(result.completed);
+        });
+    }
+
+    #[test]
+    fn test_cancel_escrow_rejected_while_guard_held() {
+        // A cancellation re-entered mid-release must not remove the escrow or
+        // decrement escrow counts twice (Issue #472).
+        let (env, contract_id) = make_env();
+        let trader_a = Address::generate(&env);
+        let trader_b = Address::generate(&env);
+
+        let escrow_id = env.as_contract(&contract_id, || {
+            open_and_confirm_escrow(&env, &trader_a, &trader_b)
+        });
+
+        env.as_contract(&contract_id, || {
+            crate::reentrancy_guard::acquire(&env).expect("lock should be free");
+            let result = cancel_escrow(&env, escrow_id, trader_a.clone());
+            assert_eq!(result, Err(EscrowError::Reentrancy));
+            crate::reentrancy_guard::release(&env);
+            assert!(get_escrow(&env, escrow_id).is_some());
+        });
+
+        env.as_contract(&contract_id, || {
+            cancel_escrow(&env, escrow_id, trader_a.clone())
+                .expect("cancel_escrow should succeed once unlocked");
+            assert!(get_escrow(&env, escrow_id).is_none());
         });
     }
 

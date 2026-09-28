@@ -22,6 +22,45 @@
 //! The lock lives in instance storage, so it is automatically rolled back if
 //! the transaction panics — a failed guarded call can never leave the contract
 //! permanently locked.
+//!
+//! ## Protection pattern (Issue #472)
+//!
+//! Every value-moving entry point follows the same shape:
+//!
+//! 1. **Auth** — `require_auth` for the acting address.
+//! 2. **Lock** — [`with_guard`] acquires the contract-wide mutex. The lock is
+//!    global rather than per-function, so it also stops *cross-function*
+//!    reentrancy (e.g. a claim callback that tries to dissolve the bond it is
+//!    claiming from).
+//! 3. **Checks → Effects → Interactions** — inside the lock, validate inputs
+//!    and state, write every balance/status change, and only then publish
+//!    events or call out. A nested call therefore never observes half-applied
+//!    state, and even if it could bypass the lock, the state it reads is
+//!    already final (e.g. a vault is marked `claimed` before the payout is
+//!    reported).
+//!
+//! Guarded entry points that compose each other must not nest [`with_guard`]:
+//! the second `acquire` would reject the caller's own call. Each guarded
+//! `pub fn foo` is therefore a thin wrapper around a private `foo_unguarded`
+//! body, and composite paths (e.g.
+//! `dex_integration::harvest_and_list` → `resource_minter::harvest_resources`)
+//! call the unguarded body while already holding the lock.
+//!
+//! Guarded entry points:
+//!
+//! | Module | Functions |
+//! |---|---|
+//! | `resource_minter` | `mint_resource`, `harvest_resources`, `auto_list_on_dex` |
+//! | `dex_integration` | `harvest_and_list`, `cancel_listing` (and `list_at_market` via `harvest_and_list`) |
+//! | `trading` | `place_limit_order`, `cancel_limit_order`, `record_trade`, `add_liquidity`, `remove_liquidity`, `swap_exact_input` |
+//! | `escrow_trader` | `complete_escrow`, `cancel_escrow` |
+//! | `nomad_bonding` | `delegate_yield`, `claim_yield`, `dissolve_bond` |
+//! | `treasure_vault` | `deposit_treasure`, `claim_treasure` |
+//!
+//! Low-level ledger primitives (`resource_minter::credit_balance`,
+//! `debit_balance`, `move_balance`, …) are deliberately *not* guarded: they
+//! are only reachable from other modules' already-guarded or auth-checked
+//! paths, and guarding them would make those callers self-block.
 
 use soroban_sdk::{contracterror, contracttype, Env};
 
@@ -139,6 +178,19 @@ mod tests {
         pub fn locked(env: Env) -> bool {
             is_locked(&env)
         }
+
+        /// A guarded section that calls a *different* guarded section —
+        /// cross-function reentrancy, e.g. a claim callback trying to
+        /// dissolve the bond it is claiming from.
+        pub fn cross(env: Env) -> Result<u32, ReentrancyError> {
+            with_guard(&env, || Self::single(env.clone()))
+        }
+
+        /// A guarded section whose body fails. The lock must still be
+        /// released so the contract is not left permanently locked.
+        pub fn fail(env: Env) -> Result<u32, ReentrancyError> {
+            with_guard(&env, || Err(ReentrancyError::ReentrantCall))
+        }
     }
 
     #[test]
@@ -161,5 +213,50 @@ mod tests {
         assert_eq!(client.locked(), false);
         // A subsequent call still succeeds (the guard is not stuck).
         assert_eq!(client.single(), 42);
+    }
+
+    #[test]
+    fn blocks_cross_function_reentry() {
+        let env = Env::default();
+        let id = env.register(GuardTestContract, ());
+        let client = GuardTestContractClient::new(&env, &id);
+
+        assert_eq!(client.try_cross(), Err(Ok(ReentrancyError::ReentrantCall)));
+        // The outer failure rolled back cleanly; unrelated calls still work.
+        assert!(!client.locked());
+        assert_eq!(client.single(), 42);
+    }
+
+    #[test]
+    fn releases_lock_when_body_errors() {
+        let env = Env::default();
+        let id = env.register(GuardTestContract, ());
+
+        env.as_contract(&id, || {
+            let result: Result<u32, ReentrancyError> =
+                with_guard(&env, || Err(ReentrancyError::ReentrantCall));
+            assert!(result.is_err());
+            assert!(!is_locked(&env));
+        });
+
+        let client = GuardTestContractClient::new(&env, &id);
+        assert!(client.try_fail().is_err());
+        assert!(!client.locked());
+        assert_eq!(client.single(), 42);
+    }
+
+    #[test]
+    fn acquire_release_round_trip() {
+        let env = Env::default();
+        let id = env.register(GuardTestContract, ());
+
+        env.as_contract(&id, || {
+            assert!(!is_locked(&env));
+            acquire(&env).expect("lock should be free");
+            assert!(is_locked(&env));
+            assert_eq!(acquire(&env), Err(ReentrancyError::ReentrantCall));
+            release(&env);
+            assert!(!is_locked(&env));
+        });
     }
 }
