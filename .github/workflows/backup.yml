@@ -51,7 +51,7 @@ jobs:
           aws s3 cp backups/*.tar.gz s3://$S3_BUCKET/backups/ --recursive
 
       - name: Upload backup artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backup-${{ github.run_number }}
           path: backups/*.tar.gz
@@ -130,7 +130,7 @@ jobs:
           echo "Recovery Time: < 1 hour" >> drill-report.md
 
       - name: Upload drill report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: drill-report-${{ github.run_number }}
           path: drill-report.md

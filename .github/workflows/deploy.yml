@@ -55,7 +55,7 @@ jobs:
           echo "Optimized size: $(stat -c%s optimized.wasm) bytes"
 
       - name: Upload optimized WASM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: optimized-wasm
           path: optimized.wasm
@@ -141,7 +141,7 @@ jobs:
           cat deployments/${{ env.SOROBAN_NETWORK }}-latest.json
 
       - name: Upload deployment record
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deployment-${{ env.SOROBAN_NETWORK }}-${{ github.sha }}
           path: deployments/
