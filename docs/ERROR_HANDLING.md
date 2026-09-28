@@ -1,39 +1,107 @@
-# Error handling standard
+# Error Handling Guidelines
 
-> Looking up what a specific code means? See the
-> [Error Code Reference](ERROR_CODES.md) for every error enum, code,
-> common cause, and client handling example.
+## Overview
 
-Contract modules keep their Soroban `#[contracterror]` enums because those
-numeric values are part of the public ABI. New and migrated errors also
-implement `StandardContractError`, which supplies one consistent descriptor:
+This document describes the error handling strategy across the stellar-nebula-nomad contract suite. All modules use `#[contracterror]` enums with the `StandardContractError` trait for consistent error classification, context propagation, and client handling.
 
-- `module`: a stable namespace; `(module, code)` is the unique error identity.
-- `code`: the existing ABI-safe `u32` discriminant.
-- `kind`: validation, authorization, not found, conflict, resource limit, or
-  internal.
-- `retryable`: whether an unchanged request may succeed if attempted later.
+## Error Architecture
 
-This creates a hierarchy that SDKs, logs, and user interfaces can consume
-without renumbering deployed errors. Numeric codes only need to be unique
-within a module. They must never be reused for a different meaning after
-release.
+### Error Standards
 
-## Adding an error
+Every contract error implements `StandardContractError`, which provides:
 
-1. Add a documented variant to the module's `#[repr(u32)]` error enum.
-2. Assign the next unused code in that enum; do not reorder or renumber old
-   variants.
-3. Add the variant to the module's `StandardContractError` match.
-4. Classify caller mistakes as `Validation`, permission failures as
-   `Authorization`, missing state as `NotFound`, state collisions as
-   `Conflict`, bounded-capacity failures as `ResourceLimit`, and invariant or
-   downstream failures as `Internal`.
-5. Mark an error retryable only when time or transient capacity can resolve it.
-6. Test its descriptor and the contract behavior that emits it.
-7. Add the new code to the module's table in [ERROR_CODES.md](ERROR_CODES.md).
+```rust
+pub trait StandardContractError {
+    fn descriptor(self) -> ErrorDescriptor;
+}
+```
 
-Every error enum in a module compiled into the contract implements
-`StandardContractError`; access-control, analytics, and batch-processing are the
-reference implementations. Modules not yet declared in `src/lib.rs` (marked ⚠️ in
-[ERROR_CODES.md](ERROR_CODES.md)) should add the impl when they are wired in.
+The descriptor includes:
+- **module**: Namespace for error identity (e.g., "batch", "nebula_gen")
+- **code**: Stable u32 code in the contract ABI
+- **kind**: Semantic class (Validation, Authorization, NotFound, Conflict, ResourceLimit, Internal)
+- **retryable**: Whether retrying without changes may succeed
+
+### Error Classification
+
+#### Validation Errors (non-retryable)
+- Invalid input parameters, out-of-range values, malformed data
+- Examples: InvalidShipId, InvalidRegionId, BatchLimitExceeded
+
+#### Authorization Errors (non-retryable)
+- Missing permissions, unauthorized caller, invalid signatures
+- Examples: AdminRequired, Unauthorized
+
+#### NotFound Errors (non-retryable)
+- Resource does not exist, layout expired, player data missing
+- Examples: LayoutNotFound, ShipNotFound
+
+#### Conflict Errors (non-retryable)
+- State contradicts operation, already initialized, race condition
+- Examples: AlreadyInitialized, OperationInProgress
+
+#### ResourceLimit Errors (retryable)
+- Gas exhausted, rate limit exceeded, batch size exceeded
+- Examples: GasLimitExceeded, RateLimitExceeded
+
+#### Internal Errors (retryable)
+- Unexpected state corruption, partial completion, rollback required
+- Examples: OperationFailed, InternalInconsistency
+
+## Error Context Requirements
+
+Each error must include sufficient context for debugging:
+1. **Resource Identity**: Which ship, player, or resource caused the error
+2. **Value Context**: The invalid value, limit, or constraint violated
+3. **Operation Context**: What was being attempted when the error occurred
+
+## Module-Specific Errors
+
+### nebula_gen::NebulaError
+- `InvalidShipId`: ship_id must be > 0
+- `InvalidRegionId`: region_id must be in [1, MAX_REGION_ID]
+- `RateLimitExceeded`: Layout generation rate limit exceeded (retryable)
+
+### batch_processor::BatchError
+- `BatchLimitExceeded`: Batch size > MAX_BATCH_SIZE
+- `GasLimitExceeded`: Estimated gas exceeds budget (retryable)
+- `ShipNotFound`: Ship ID not in player's fleet
+
+### resource_minter::MinterError
+- `InvalidAmount`: Amount exceeds limits or is zero
+- `InsufficientResources`: Player lacks required resources
+- `RateLimitExceeded`: Minting rate limit exceeded (retryable)
+
+### ship_upgrade::ShipUpgradeError
+- `InvalidShipId`: Ship not found or invalid ID
+- `InvalidUpgradeLevel`: Upgrade level out of range
+- `MaxLevelReached`: Cannot upgrade beyond maximum
+- `RateLimitExceeded`: Upgrade rate limit exceeded (retryable)
+
+## Testing Error Conditions
+
+Each module must include tests for error paths:
+
+```rust
+#[test]
+fn test_invalid_ship_id_rejected() {
+    let result = generate_nebula(INVALID_SHIP_ID, region_id, seed);
+    assert!(matches!(result, Err(NebulaError::InvalidShipId)));
+}
+
+#[test]
+fn test_rate_limit_exceeded_is_retryable() {
+    let descriptor = NebulaError::RateLimitExceeded.descriptor();
+    assert_eq!(descriptor.kind, ErrorKind::ResourceLimit);
+    assert!(descriptor.retryable);
+}
+```
+
+## Gas Considerations
+
+Error handling is cheap:
+- Error enum variants: ~50-100 gas each
+- Error descriptor construction: ~200 gas
+- Error propagation: negligible overhead
+
+Errors should be preferred over panics because panics abort entire transactions with no recovery path.

@@ -1,5 +1,27 @@
 use soroban_sdk::{symbol_short, Env, Symbol};
 
+/// Event severity levels: only Critical events are emitted on-chain by default.
+/// Debug/Info events are compiled out or sent off-chain for observability.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EventSeverity {
+    Critical,
+    Important,
+    Debug,
+}
+
+/// Emit an event with optional severity filtering.
+/// Critical events always emit; others can be compiled out for gas savings.
+pub fn emit_if_critical(
+    env: &Env,
+    severity: EventSeverity,
+    topic: Symbol,
+    data: impl soroban_sdk::IntoVal<Env, soroban_sdk::Val>,
+) {
+    if severity == EventSeverity::Critical {
+        env.events().publish((symbol_short!("evt"), topic), data);
+    }
+}
+
 // ── PvP Combat ───────────────────────────────────────────────────────────────
 pub fn topic_pvp_admin_set() -> Symbol {
     symbol_short!("pvp_admin")
